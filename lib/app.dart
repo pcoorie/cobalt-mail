@@ -7,19 +7,15 @@ import 'providers/unified_inbox_providers.dart';
 import 'screens/account_list_screen.dart';
 import 'screens/account_form_screen.dart';
 import 'screens/folder_view_screen.dart';
+import 'theme/brand_colors.dart';
 
-const _brandSeed = Color(0xFF0A5BD6);
-
-/// A light, on-brand colored header for every screen's app bar (Outlook's
-/// blue-header look, without matching its full saturation — the design spec
-/// this app is going for calls for something lighter). `primaryContainer` is
-/// Material 3's own "light tint of the seed color" tone — already the exact
-/// same blue as the app icon (`_brandSeed`), just pastel — so this reuses it
-/// rather than hand-picking a new color that would need separate light/dark
-/// variants and could drift from the icon's blue over time.
-AppBarTheme _appBarTheme(ColorScheme scheme) => AppBarTheme(
-      backgroundColor: scheme.primaryContainer,
-      foregroundColor: scheme.onPrimaryContainer,
+/// A solid, on-brand colored header for every screen's app bar (Gmail/
+/// Outlook's full-saturation blue-header look). Uses `brandSeed` directly
+/// rather than a scheme-derived tone so it stays the exact same blue as the
+/// app icon in both light and dark mode.
+AppBarTheme _appBarTheme() => const AppBarTheme(
+      backgroundColor: brandSeed,
+      foregroundColor: Colors.white,
     );
 
 class ImapMailApp extends ConsumerStatefulWidget {
@@ -54,20 +50,20 @@ class _ImapMailAppState extends ConsumerState<ImapMailApp> {
   @override
   Widget build(BuildContext context) {
     final themeMode = ref.watch(themeModeProvider);
-    final lightScheme = ColorScheme.fromSeed(seedColor: _brandSeed);
-    final darkScheme = ColorScheme.fromSeed(seedColor: _brandSeed, brightness: Brightness.dark);
+    final lightScheme = ColorScheme.fromSeed(seedColor: brandSeed);
+    final darkScheme = ColorScheme.fromSeed(seedColor: brandSeed, brightness: Brightness.dark);
     return MaterialApp(
       title: 'Cobalt Mail',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: lightScheme,
         useMaterial3: true,
-        appBarTheme: _appBarTheme(lightScheme),
+        appBarTheme: _appBarTheme(),
       ),
       darkTheme: ThemeData(
         colorScheme: darkScheme,
         useMaterial3: true,
-        appBarTheme: _appBarTheme(darkScheme),
+        appBarTheme: _appBarTheme(),
       ),
       themeMode: themeMode,
       home: Consumer(
