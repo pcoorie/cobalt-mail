@@ -77,24 +77,30 @@ class _FolderTreeExpanderState extends State<FolderTreeExpander> {
                       color: scheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    child: ListView(
-                      shrinkWrap: true,
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      children: widget.folders
-                          .map((folder) => ListTile(
-                                dense: true,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                leading: Icon(
-                                  Icons.folder_outlined,
-                                  color: scheme.onSurfaceVariant,
-                                  size: 20,
-                                ),
-                                title: Text(folder.name),
-                                onTap: () => widget.onSelect(folder),
-                              ))
-                          .toList(),
+                    // ListTile paints its ink splashes/background on the
+                    // nearest Material ancestor — without this, they'd be
+                    // hidden behind the opaque DecoratedBox above.
+                    child: Material(
+                      type: MaterialType.transparency,
+                      child: ListView(
+                        shrinkWrap: true,
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        children: widget.folders
+                            .map((folder) => ListTile(
+                                  dense: true,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  leading: Icon(
+                                    Icons.folder_outlined,
+                                    color: scheme.onSurfaceVariant,
+                                    size: 20,
+                                  ),
+                                  title: Text(folder.name),
+                                  onTap: () => widget.onSelect(folder),
+                                ))
+                            .toList(),
+                      ),
                     ),
                   ),
           ),

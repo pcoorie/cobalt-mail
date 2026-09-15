@@ -15,6 +15,13 @@ analyzer:
     # COBALT_MAIL_PATCH.md) — treat it like any other pub dependency,
     # not part of this app's own code.
     - third_party/**
+    - build/**
+    - android/**
+    - ios/**
+    - web/**
+    - windows/**
+    - macos/**
+    - linux/**
 
 linter:
   # The lint rules applied to this project can be customized in the
