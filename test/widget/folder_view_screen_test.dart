@@ -683,6 +683,60 @@ void main() {
     expect(find.byType(CircularProgressIndicator), findsWidgets);
   });
 
+  group('unread-only filter', () {
+    testWidgets('toggling the app bar filter hides read messages and toggling it off restores them',
+        (tester) async {
+      final read = message.copyWith(id: 101, uid: 2, subject: 'Read one', isRead: true);
+      await tester.pumpWidget(ProviderScope(
+        overrides: [
+          foldersProvider.overrideWith((ref, id) async => [inbox, sent, trash]),
+          messagesProvider.overrideWith((ref, folder) async => folder.id == inbox.id ? [message, read] : const []),
+          accountsProvider.overrideWith(() => _FakeAccountsNotifier([account])),
+          swipeActionConfigProvider.overrideWith(() => _FakeSwipeActionConfigNotifier(SwipeActionConfig.defaults)),
+        ],
+        child: const MaterialApp(home: FolderViewScreen(accountId: accountId)),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Hello'), findsOneWidget);
+      expect(find.text('Read one'), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.mark_email_unread_outlined));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Hello'), findsOneWidget);
+      expect(find.text('Read one'), findsNothing);
+      expect(find.byIcon(Icons.mark_email_unread), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.mark_email_unread));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Hello'), findsOneWidget);
+      expect(find.text('Read one'), findsOneWidget);
+    });
+
+    testWidgets(
+        'shows an "unread" empty-state message when the folder has messages but none are unread',
+        (tester) async {
+      final read = message.copyWith(isRead: true);
+      await tester.pumpWidget(ProviderScope(
+        overrides: [
+          foldersProvider.overrideWith((ref, id) async => [inbox, sent, trash]),
+          messagesProvider.overrideWith((ref, folder) async => folder.id == inbox.id ? [read] : const []),
+          accountsProvider.overrideWith(() => _FakeAccountsNotifier([account])),
+          swipeActionConfigProvider.overrideWith(() => _FakeSwipeActionConfigNotifier(SwipeActionConfig.defaults)),
+        ],
+        child: const MaterialApp(home: FolderViewScreen(accountId: accountId)),
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.mark_email_unread_outlined));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No unread messages in Inbox'), findsOneWidget);
+    });
+  });
+
   testWidgets('the app bar search icon opens SearchScreen', (tester) async {
     await tester.pumpWidget(ProviderScope(
       overrides: [
