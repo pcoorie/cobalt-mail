@@ -237,6 +237,13 @@ class _FolderViewScreenState extends ConsumerState<FolderViewScreen> {
   Widget build(BuildContext context) {
     final foldersAsync = ref.watch(foldersProvider(widget.accountId));
     final syncError = ref.watch(syncErrorProvider(widget.accountId));
+    // See localFolderUnreadCountsProvider's doc comment: foldersAsync's own
+    // MailFolder.unreadCount is a cached snapshot that a mark-read/unread,
+    // archive, delete, or move never updates in place — this overlays the
+    // true local count onto it below so FolderTabBar's pill can't go stale.
+    final localUnreadCounts =
+        ref.watch(localFolderUnreadCountsProvider(widget.accountId)).valueOrNull ??
+            const <int, int>{};
     final current = _currentFolder(foldersAsync.valueOrNull);
 
     return Scaffold(
@@ -261,9 +268,15 @@ class _FolderViewScreenState extends ConsumerState<FolderViewScreen> {
               MailFolderType.sent,
               MailFolderType.trash,
             ])
-              ...folders.where((f) => f.type == type),
+              for (final f in folders.where((f) => f.type == type))
+                f.copyWith(unreadCount: localUnreadCounts[f.id] ?? f.unreadCount),
           ];
-          final rest = folders.where((f) => !defaults.contains(f)).toList();
+          // Compares by id/type, not value-equality against `defaults`:
+          // `defaults`' entries carry an overlaid `unreadCount` (see above),
+          // so `MailFolder`'s Equatable props (which include `unreadCount`)
+          // would no longer match the corresponding entry in `folders`.
+          final defaultIds = defaults.map((f) => f.id).toSet();
+          final rest = folders.where((f) => !defaultIds.contains(f.id)).toList();
           final current = _currentFolder(folders);
 
           return Column(

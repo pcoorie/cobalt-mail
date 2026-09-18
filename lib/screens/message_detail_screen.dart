@@ -14,6 +14,7 @@ import '../providers/attachment_opener_providers.dart';
 import '../providers/filesystem_providers.dart';
 import '../providers/message_providers.dart';
 import '../providers/repository_providers.dart';
+import '../providers/sync_status_providers.dart';
 import '../widgets/attachment_tile.dart';
 import 'compose_screen.dart';
 
@@ -70,9 +71,21 @@ class _MessageDetailScreenState extends ConsumerState<MessageDetailScreen> {
       // opening and reading a cached message offline silently never marks it
       // read, with zero feedback.
       if (resolved.id != null) {
+        // markRead persists the recomputed unread_count locally before it
+        // ever touches the server (see MailRepository.markRead), so that
+        // write is already final by the time this future settles either
+        // way — bump the tick here so FolderTabBar's pill and the app
+        // badge/total-unread count stop showing the pre-read value. Nothing
+        // else on this screen's auto-mark-read path does this (unlike the
+        // swipe/bulk-action paths, which all bump it themselves).
         unawaited(repository
             .markRead(account, widget.folder, resolved, true, revertLocalOnFailure: false)
-            .catchError((_) {}));
+            .catchError((_) {})
+            .whenComplete(() {
+          if (mounted) {
+            ref.read(unreadCountRefreshTickProvider.notifier).state++;
+          }
+        }));
       }
     } on MessageNotFoundException {
       // The repository already dropped the now-confirmed-gone local row.
