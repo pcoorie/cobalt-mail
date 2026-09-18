@@ -43,3 +43,12 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Local secrets / environment config
+.env
+.env.*
+
+# AI assistant local state (settings, worktrees, session data) — not
+# relevant to other contributors and may contain local machine paths.
+.claude/
+.superpowers/

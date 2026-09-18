@@ -51,4 +51,22 @@ void main() {
     expect(find.text('Inbox'), findsOneWidget);
     expect(find.text('Sent'), findsOneWidget);
   });
+
+  testWidgets('tapping a segment calls onSelect with that folder', (tester) async {
+    MailFolder? tapped;
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: FolderTabBar(
+          folders: [inbox, sent],
+          selected: inbox,
+          onSelect: (folder) => tapped = folder,
+        ),
+      ),
+    ));
+
+    await tester.tap(find.text('Sent'));
+    await tester.pumpAndSettle();
+
+    expect(tapped, sent);
+  });
 }
