@@ -1,6 +1,6 @@
 # Cobalt Mail
 
-A personal, multi-account email client built for people who just want IMAP and SMTP to work — no OAuth consent screens, no provider lock-in, no third-party mail APIs sitting between you and your inbox. Add any standard IMAP/SMTP account (Gmail, Outlook, Fastmail, a work server, your own domain) with its host and port, and you're reading mail.
+A personal, multi-account email client built for people who just want IMAP and SMTP to work — no OAuth consent screens, no provider lock-in, no third-party mail APIs sitting between you and your inbox. Add any standard IMAP/SMTP account (iCloud Mail, Fastmail, a work server, your own domain) with its host and port, and you're reading mail. Gmail and Outlook/Hotmail aren't supported — both now require an OAuth sign-in this app doesn't do.
 
 ## Why
 
