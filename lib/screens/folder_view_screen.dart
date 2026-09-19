@@ -264,6 +264,7 @@ class _FolderViewScreenState extends ConsumerState<FolderViewScreen> {
                   builder: (_) => ComposeScreen(accountId: widget.accountId),
                 ),
               ),
+              tooltip: 'Compose',
               child: const Icon(Icons.edit),
             ),
       body: foldersAsync.when(

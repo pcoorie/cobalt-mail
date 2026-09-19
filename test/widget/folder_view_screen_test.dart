@@ -120,6 +120,20 @@ void main() {
     expect(find.byIcon(Icons.inbox_outlined), findsOneWidget);
   });
 
+  testWidgets('compose FAB has a "Compose" tooltip for accessibility', (tester) async {
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        foldersProvider.overrideWith((ref, id) async => [inbox, sent, trash]),
+        messagesProvider.overrideWith((ref, folder) async => const []),
+        swipeActionConfigProvider.overrideWith(() => _FakeSwipeActionConfigNotifier(SwipeActionConfig.defaults)),
+      ],
+      child: const MaterialApp(home: FolderViewScreen(accountId: accountId)),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('Compose'), findsOneWidget);
+  });
+
   testWidgets('separates message rows with a thin divider when there is more than one',
       (tester) async {
     final second = message.copyWith(id: 101, uid: 2, subject: 'Second');

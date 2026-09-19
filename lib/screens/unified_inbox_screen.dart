@@ -94,6 +94,7 @@ class UnifiedInboxScreen extends ConsumerWidget {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _compose(context, ref),
+        tooltip: 'Compose',
         child: const Icon(Icons.edit),
       ),
       body: const _UnifiedMessageList(),
