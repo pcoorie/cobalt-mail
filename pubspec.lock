@@ -66,7 +66,7 @@ packages:
     source: hosted
     version: "0.2.4"
   basic_utils:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: basic_utils
       sha256: "548047bef0b3b697be19fa62f46de54d99c9019a69fb7db92c69e19d87f633c7"
@@ -1149,7 +1149,7 @@ packages:
     source: hosted
     version: "2.3.1"
   url_launcher:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: url_launcher
       sha256: f6a7e5c4835bb4e3026a04793a4199ca2d14c739ec378fdfe23fc8075d0439f8

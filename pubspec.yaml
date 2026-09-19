@@ -53,6 +53,10 @@ dependencies:
   # in HTML message bodies) — declared directly now that SendSoundPlayer
   # also uses it for the send "swoosh" effect.
   just_audio: ^0.10.6
+  # Already resolved transitively (enough_mail's DNS lookups) — declared
+  # directly now that AccountDiscoveryService also uses it for SRV lookups.
+  basic_utils: ^5.8.2
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:
