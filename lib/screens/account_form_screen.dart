@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/enums.dart';
 import '../models/mail_account.dart';
+import '../models/provider_preset.dart';
 import '../providers/account_providers.dart';
 import '../providers/repository_providers.dart';
 
@@ -29,6 +30,16 @@ class _AccountFormScreenState extends ConsumerState<AccountFormScreen> {
   bool _testing = false;
   bool _saving = false;
 
+  // Only relevant when adding a new account: a recognized email domain
+  // auto-fills the host/port/security/username fields and hides them behind
+  // "Advanced setup", so a new user isn't asked for server details up front.
+  bool _advancedExpanded = false;
+  ProviderPreset? _detectedPreset;
+
+  bool get _isNewAccount => widget.existing == null;
+  bool get _showAdvancedFields =>
+      !_isNewAccount || _advancedExpanded || _detectedPreset == null;
+
   @override
   void initState() {
     super.initState();
@@ -43,10 +54,31 @@ class _AccountFormScreenState extends ConsumerState<AccountFormScreen> {
     _imapSecurity = existing?.imapSecurity ?? MailSecurity.ssl;
     _smtpSecurity = existing?.smtpSecurity ?? MailSecurity.ssl;
     for (final controller in [
-      _displayName, _email, _imapHost, _imapPort, _smtpHost, _smtpPort, _username, _password,
+      _displayName, _imapHost, _imapPort, _smtpHost, _smtpPort, _username, _password,
     ]) {
       controller.addListener(() => setState(() {}));
     }
+    _email.addListener(_onEmailChanged);
+  }
+
+  void _onEmailChanged() {
+    if (!_isNewAccount || _advancedExpanded) {
+      setState(() {});
+      return;
+    }
+    final preset = lookupProviderPreset(_email.text.trim());
+    setState(() {
+      _detectedPreset = preset;
+      if (preset != null) {
+        _imapHost.text = preset.imapHost;
+        _imapPort.text = preset.imapPort.toString();
+        _imapSecurity = preset.imapSecurity;
+        _smtpHost.text = preset.smtpHost;
+        _smtpPort.text = preset.smtpPort.toString();
+        _smtpSecurity = preset.smtpSecurity;
+        _username.text = _email.text.trim();
+      }
+    });
   }
 
   @override
@@ -156,44 +188,56 @@ class _AccountFormScreenState extends ConsumerState<AccountFormScreen> {
           TextField(key: const Key('emailField'), controller: _email,
               decoration: const InputDecoration(labelText: 'Email')),
           const SizedBox(height: 16),
-          TextField(key: const Key('imapHostField'), controller: _imapHost,
-              decoration: const InputDecoration(labelText: 'IMAP host')),
-          TextField(key: const Key('imapPortField'), controller: _imapPort,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'IMAP port')),
-          DropdownButtonFormField<MailSecurity>(
-            key: const Key('imapSecurityDropdown'),
-            initialValue: _imapSecurity,
-            decoration: const InputDecoration(labelText: 'IMAP security'),
-            items: MailSecurity.values
-                .map((security) => DropdownMenuItem(
-                      value: security,
-                      child: Text(_securityLabel(security)),
-                    ))
-                .toList(),
-            onChanged: (value) => setState(() => _imapSecurity = value!),
-          ),
-          const SizedBox(height: 16),
-          TextField(key: const Key('smtpHostField'), controller: _smtpHost,
-              decoration: const InputDecoration(labelText: 'SMTP host')),
-          TextField(key: const Key('smtpPortField'), controller: _smtpPort,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'SMTP port')),
-          DropdownButtonFormField<MailSecurity>(
-            key: const Key('smtpSecurityDropdown'),
-            initialValue: _smtpSecurity,
-            decoration: const InputDecoration(labelText: 'SMTP security'),
-            items: MailSecurity.values
-                .map((security) => DropdownMenuItem(
-                      value: security,
-                      child: Text(_securityLabel(security)),
-                    ))
-                .toList(),
-            onChanged: (value) => setState(() => _smtpSecurity = value!),
-          ),
-          const SizedBox(height: 16),
-          TextField(key: const Key('usernameField'), controller: _username,
-              decoration: const InputDecoration(labelText: 'Username')),
+          if (_showAdvancedFields) ...[
+            TextField(key: const Key('imapHostField'), controller: _imapHost,
+                decoration: const InputDecoration(labelText: 'IMAP host')),
+            TextField(key: const Key('imapPortField'), controller: _imapPort,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'IMAP port')),
+            DropdownButtonFormField<MailSecurity>(
+              key: const Key('imapSecurityDropdown'),
+              initialValue: _imapSecurity,
+              decoration: const InputDecoration(labelText: 'IMAP security'),
+              items: MailSecurity.values
+                  .map((security) => DropdownMenuItem(
+                        value: security,
+                        child: Text(_securityLabel(security)),
+                      ))
+                  .toList(),
+              onChanged: (value) => setState(() => _imapSecurity = value!),
+            ),
+            const SizedBox(height: 16),
+            TextField(key: const Key('smtpHostField'), controller: _smtpHost,
+                decoration: const InputDecoration(labelText: 'SMTP host')),
+            TextField(key: const Key('smtpPortField'), controller: _smtpPort,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'SMTP port')),
+            DropdownButtonFormField<MailSecurity>(
+              key: const Key('smtpSecurityDropdown'),
+              initialValue: _smtpSecurity,
+              decoration: const InputDecoration(labelText: 'SMTP security'),
+              items: MailSecurity.values
+                  .map((security) => DropdownMenuItem(
+                        value: security,
+                        child: Text(_securityLabel(security)),
+                      ))
+                  .toList(),
+              onChanged: (value) => setState(() => _smtpSecurity = value!),
+            ),
+            const SizedBox(height: 16),
+            TextField(key: const Key('usernameField'), controller: _username,
+                decoration: const InputDecoration(labelText: 'Username')),
+          ] else if (_detectedPreset != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text('Detected ${_detectedPreset!.name} settings'),
+            ),
+          if (_isNewAccount && _detectedPreset != null)
+            TextButton(
+              key: const Key('advancedSetupToggle'),
+              onPressed: () => setState(() => _advancedExpanded = !_advancedExpanded),
+              child: Text(_advancedExpanded ? 'Hide advanced setup' : 'Advanced setup'),
+            ),
           TextField(key: const Key('passwordField'), controller: _password, obscureText: true,
               decoration: const InputDecoration(labelText: 'Password')),
           const SizedBox(height: 16),

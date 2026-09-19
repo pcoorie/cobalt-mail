@@ -208,4 +208,111 @@ void main() {
     expect(notifier.updateCalled, isTrue);
     expect(notifier.lastUpdatedPassword, 'new-password');
   });
+
+  testWidgets('new account: a recognized email hides the advanced fields and shows the detected provider',
+      (tester) async {
+    await useTallSurface(tester);
+    await tester.pumpWidget(const ProviderScope(
+      child: MaterialApp(home: AccountFormScreen()),
+    ));
+
+    await tester.enterText(find.byKey(const Key('emailField')), 'me@gmail.com');
+    await tester.pump();
+
+    expect(find.byKey(const Key('imapHostField')), findsNothing);
+    expect(find.byKey(const Key('imapPortField')), findsNothing);
+    expect(find.byKey(const Key('imapSecurityDropdown')), findsNothing);
+    expect(find.byKey(const Key('smtpHostField')), findsNothing);
+    expect(find.byKey(const Key('smtpPortField')), findsNothing);
+    expect(find.byKey(const Key('smtpSecurityDropdown')), findsNothing);
+    expect(find.byKey(const Key('usernameField')), findsNothing);
+    expect(find.textContaining('Gmail'), findsOneWidget);
+  });
+
+  testWidgets('new account: an unrecognized email leaves the full advanced form visible', (tester) async {
+    await useTallSurface(tester);
+    await tester.pumpWidget(const ProviderScope(
+      child: MaterialApp(home: AccountFormScreen()),
+    ));
+
+    await tester.enterText(find.byKey(const Key('emailField')), 'me@example.com');
+    await tester.pump();
+
+    expect(find.byKey(const Key('imapHostField')), findsOneWidget);
+    expect(find.byKey(const Key('usernameField')), findsOneWidget);
+    expect(find.byKey(const Key('advancedSetupToggle')), findsNothing);
+  });
+
+  testWidgets('new account: Advanced setup toggle reveals the fields for a matched provider, pre-filled',
+      (tester) async {
+    await useTallSurface(tester);
+    await tester.pumpWidget(const ProviderScope(
+      child: MaterialApp(home: AccountFormScreen()),
+    ));
+
+    await tester.enterText(find.byKey(const Key('emailField')), 'me@fastmail.com');
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('advancedSetupToggle')));
+    await tester.pump();
+
+    expect(
+      tester.widget<TextField>(find.byKey(const Key('imapHostField'))).controller!.text,
+      'imap.fastmail.com',
+    );
+    expect(
+      tester.widget<TextField>(find.byKey(const Key('usernameField'))).controller!.text,
+      'me@fastmail.com',
+    );
+  });
+
+  testWidgets('new account: saving with a matched provider and no override sends the preset config',
+      (tester) async {
+    await useTallSurface(tester);
+    final notifier = _RecordingAccountsNotifier([]);
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        accountsProvider.overrideWith(() => notifier),
+      ],
+      child: const MaterialApp(home: AccountFormScreen()),
+    ));
+
+    await tester.enterText(find.byKey(const Key('displayNameField')), 'Personal');
+    await tester.enterText(find.byKey(const Key('emailField')), 'me@gmail.com');
+    await tester.enterText(find.byKey(const Key('passwordField')), 'app-password');
+    await tester.pump();
+
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Save'));
+    await tester.pump();
+    await tester.pump();
+
+    expect(notifier.addCalled, isTrue);
+  });
+
+  testWidgets('editing an existing account shows the full form even with a recognized email domain',
+      (tester) async {
+    await useTallSurface(tester);
+    const gmailAccount = MailAccount(
+      id: 2,
+      displayName: 'Personal',
+      email: 'me@gmail.com',
+      imapHost: 'imap.gmail.com',
+      imapPort: 993,
+      imapSecurity: MailSecurity.ssl,
+      smtpHost: 'smtp.gmail.com',
+      smtpPort: 465,
+      smtpSecurity: MailSecurity.ssl,
+      username: 'me@gmail.com',
+    );
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        accountsProvider.overrideWith(() => _RecordingAccountsNotifier([gmailAccount])),
+      ],
+      child: const MaterialApp(home: AccountFormScreen(existing: gmailAccount)),
+    ));
+
+    expect(find.byKey(const Key('imapHostField')), findsOneWidget);
+    expect(find.byKey(const Key('usernameField')), findsOneWidget);
+    expect(find.byKey(const Key('advancedSetupToggle')), findsNothing);
+  });
 }
