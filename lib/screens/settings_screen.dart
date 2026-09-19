@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/swipe_action.dart';
 import '../providers/account_providers.dart';
+import '../providers/package_info_providers.dart';
 import '../providers/swipe_action_providers.dart';
 import '../providers/theme_providers.dart';
 import 'account_email_screen.dart';
@@ -32,6 +33,7 @@ class SettingsScreen extends ConsumerWidget {
     final accountsAsync = ref.watch(accountsProvider);
     final themeMode = ref.watch(themeModeProvider);
     final swipeConfig = ref.watch(swipeActionConfigProvider);
+    final packageInfoAsync = ref.watch(packageInfoProvider);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Settings'),
@@ -151,6 +153,21 @@ class SettingsScreen extends ConsumerWidget {
               ),
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (error, _) => Center(child: Text('Failed to load accounts: $error')),
+            ),
+          ),
+          const Divider(height: 1),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Center(
+              child: packageInfoAsync.when(
+                data: (info) => Text(
+                  'Version ${info.version} (${info.buildNumber})',
+                  key: const Key('appVersionFooter'),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                loading: () => const SizedBox.shrink(),
+                error: (_, _) => const SizedBox.shrink(),
+              ),
             ),
           ),
         ],

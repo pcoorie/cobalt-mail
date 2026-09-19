@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:imap_mail/models/enums.dart';
 import 'package:imap_mail/models/mail_account.dart';
 import 'package:imap_mail/models/swipe_action.dart';
 import 'package:imap_mail/providers/account_providers.dart';
+import 'package:imap_mail/providers/package_info_providers.dart';
 import 'package:imap_mail/providers/swipe_action_providers.dart';
 import 'package:imap_mail/providers/theme_providers.dart';
 import 'package:imap_mail/screens/account_email_screen.dart';
@@ -23,6 +25,12 @@ void main() {
     smtpSecurity: MailSecurity.ssl,
     username: 'me@example.com',
   );
+  final packageInfo = PackageInfo(
+    appName: 'Cobalt Mail',
+    packageName: 'au.coorie.cobalt_mail',
+    version: '2.0.2',
+    buildNumber: '4',
+  );
 
   testWidgets('tapping Remove shows a confirmation dialog', (tester) async {
     await tester.pumpWidget(ProviderScope(
@@ -30,6 +38,7 @@ void main() {
         accountsProvider.overrideWith(() => _FakeAccountsNotifier([account])),
         themeModeProvider.overrideWith(() => _FakeThemeModeNotifier(ThemeMode.system)),
         swipeActionConfigProvider.overrideWith(() => _FakeSwipeActionConfigNotifier(SwipeActionConfig.defaults)),
+        packageInfoProvider.overrideWith((ref) async => packageInfo),
       ],
       child: const MaterialApp(home: SettingsScreen()),
     ));
@@ -47,6 +56,7 @@ void main() {
         accountsProvider.overrideWith(() => _FakeAccountsNotifier([account])),
         themeModeProvider.overrideWith(() => _FakeThemeModeNotifier(ThemeMode.system)),
         swipeActionConfigProvider.overrideWith(() => _FakeSwipeActionConfigNotifier(SwipeActionConfig.defaults)),
+        packageInfoProvider.overrideWith((ref) async => packageInfo),
       ],
       child: const MaterialApp(home: SettingsScreen()),
     ));
@@ -65,6 +75,7 @@ void main() {
         accountsProvider.overrideWith(() => _FakeAccountsNotifier([account])),
         themeModeProvider.overrideWith(() => fakeNotifier),
         swipeActionConfigProvider.overrideWith(() => _FakeSwipeActionConfigNotifier(SwipeActionConfig.defaults)),
+        packageInfoProvider.overrideWith((ref) async => packageInfo),
       ],
       child: const MaterialApp(home: SettingsScreen()),
     ));
@@ -95,6 +106,7 @@ void main() {
         accountsProvider.overrideWith(() => _FakeAccountsNotifier([account])),
         themeModeProvider.overrideWith(() => fakeNotifier),
         swipeActionConfigProvider.overrideWith(() => _FakeSwipeActionConfigNotifier(SwipeActionConfig.defaults)),
+        packageInfoProvider.overrideWith((ref) async => packageInfo),
       ],
       child: const MaterialApp(home: SettingsScreen()),
     ));
@@ -140,6 +152,7 @@ void main() {
         accountsProvider.overrideWith(() => _FakeAccountsNotifier([account])),
         themeModeProvider.overrideWith(() => _FakeThemeModeNotifier(ThemeMode.system)),
         swipeActionConfigProvider.overrideWith(() => _FakeSwipeActionConfigNotifier(SwipeActionConfig.defaults)),
+        packageInfoProvider.overrideWith((ref) async => packageInfo),
       ],
       child: const MaterialApp(home: SettingsScreen()),
     ));
@@ -158,6 +171,7 @@ void main() {
         accountsProvider.overrideWith(() => _FakeAccountsNotifier([account])),
         themeModeProvider.overrideWith(() => _FakeThemeModeNotifier(ThemeMode.system)),
         swipeActionConfigProvider.overrideWith(() => fakeSwipeNotifier),
+        packageInfoProvider.overrideWith((ref) async => packageInfo),
       ],
       child: const MaterialApp(home: SettingsScreen()),
     ));
@@ -176,6 +190,21 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(fakeSwipeNotifier.state.leftPrimary, SwipeAction.delete);
+  });
+
+  testWidgets('shows the app version and build number from PackageInfo', (tester) async {
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        accountsProvider.overrideWith(() => _FakeAccountsNotifier([account])),
+        themeModeProvider.overrideWith(() => _FakeThemeModeNotifier(ThemeMode.system)),
+        swipeActionConfigProvider.overrideWith(() => _FakeSwipeActionConfigNotifier(SwipeActionConfig.defaults)),
+        packageInfoProvider.overrideWith((ref) async => packageInfo),
+      ],
+      child: const MaterialApp(home: SettingsScreen()),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Version 2.0.2 (4)'), findsOneWidget);
   });
 }
 
