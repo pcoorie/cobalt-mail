@@ -45,8 +45,11 @@ void main() {
 
   testWidgets('Save button is disabled until required fields are filled', (tester) async {
     await useTallSurface(tester);
+    // The email field is read-only for new accounts (Finding 2: it was
+    // already collected and validated on Screen 1), so the email here
+    // comes in via initialEmail rather than being typed into the field.
     await tester.pumpWidget(const ProviderScope(
-      child: MaterialApp(home: AccountFormScreen()),
+      child: MaterialApp(home: AccountFormScreen(initialEmail: 'me@example.com')),
     ));
     await tester.tap(find.byKey(const Key('advancedSetupToggle')));
     await tester.pump();
@@ -56,7 +59,6 @@ void main() {
     expect(saveButton().onPressed, isNull);
 
     await tester.enterText(find.byKey(const Key('displayNameField')), 'Work');
-    await tester.enterText(find.byKey(const Key('emailField')), 'me@example.com');
     await tester.enterText(find.byKey(const Key('imapHostField')), 'imap.example.com');
     await tester.enterText(find.byKey(const Key('imapPortField')), '993');
     await tester.enterText(find.byKey(const Key('smtpHostField')), 'smtp.example.com');
@@ -167,16 +169,16 @@ void main() {
       overrides: [
         accountsProvider.overrideWith(() => notifier),
       ],
-      // Mirrors app.dart: when there are zero accounts, AccountFormScreen is
-      // used directly as MaterialApp.home — not pushed via Navigator.push.
-      // There is therefore no previous route to pop back to.
-      child: const MaterialApp(home: AccountFormScreen()),
+      // Regression coverage for AccountFormScreen being used directly as
+      // MaterialApp.home with no previous route to pop back to. The email
+      // field is read-only for new accounts (Finding 2), so it comes in
+      // via initialEmail here rather than being typed into the field.
+      child: const MaterialApp(home: AccountFormScreen(initialEmail: 'me@example.com')),
     ));
     await tester.tap(find.byKey(const Key('advancedSetupToggle')));
     await tester.pump();
 
     await tester.enterText(find.byKey(const Key('displayNameField')), 'Work');
-    await tester.enterText(find.byKey(const Key('emailField')), 'me@example.com');
     await tester.enterText(find.byKey(const Key('imapHostField')), 'imap.example.com');
     await tester.enterText(find.byKey(const Key('imapPortField')), '993');
     await tester.enterText(find.byKey(const Key('smtpHostField')), 'smtp.example.com');
@@ -297,6 +299,11 @@ void main() {
       )),
     ));
 
+    // A partial discovery result (IMAP resolved, SMTP not) still leaves the
+    // form unsavable without expanding Advanced setup, so the caption must
+    // appear here too, not just for a fully-null config.
+    expect(find.byKey(const Key('discoveryFailedCaption')), findsOneWidget);
+
     await tester.tap(find.byKey(const Key('advancedSetupToggle')));
     await tester.pump();
 
@@ -333,6 +340,40 @@ void main() {
     await tester.pump();
 
     expect(notifier.addCalled, isTrue);
+  });
+
+  testWidgets('new account: the email field is read-only (Screen 1 already collected and validated it)',
+      (tester) async {
+    await useTallSurface(tester);
+    await tester.pumpWidget(const ProviderScope(
+      child: MaterialApp(home: AccountFormScreen(initialEmail: 'me@example.com')),
+    ));
+
+    final emailField = tester.widget<TextField>(find.byKey(const Key('emailField')));
+    expect(emailField.readOnly, isTrue);
+
+    // Attempting to type into it must not change its text — readOnly
+    // blocks keyboard input, unlike merely disabling the field visually.
+    await tester.enterText(find.byKey(const Key('emailField')), 'me@gmail.com');
+    await tester.pump();
+    expect(emailField.controller!.text, 'me@example.com');
+  });
+
+  testWidgets('editing an existing account: the email field remains fully editable', (tester) async {
+    await useTallSurface(tester);
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        accountsProvider.overrideWith(() => _RecordingAccountsNotifier([existingAccount])),
+      ],
+      child: const MaterialApp(home: AccountFormScreen(existing: existingAccount)),
+    ));
+
+    final emailField = tester.widget<TextField>(find.byKey(const Key('emailField')));
+    expect(emailField.readOnly, isFalse);
+
+    await tester.enterText(find.byKey(const Key('emailField')), 'changed@example.com');
+    await tester.pump();
+    expect(emailField.controller!.text, 'changed@example.com');
   });
 
   testWidgets('editing an existing account shows the full form even with a recognized email domain',

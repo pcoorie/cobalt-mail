@@ -45,7 +45,16 @@ class _AccountFormScreenState extends ConsumerState<AccountFormScreen> {
 
   bool get _isNewAccount => widget.existing == null;
   bool get _showAdvancedFields => !_isNewAccount || _advancedExpanded;
-  bool get _discoveryFoundNothing => _isNewAccount && widget.discoveredConfig == null;
+  // True whenever the new-account form can't be saved without expanding
+  // Advanced setup: either discovery found nothing at all, or it found a
+  // partial result (e.g. SRV resolved IMAP but not SMTP) that still leaves
+  // one of the two required hosts empty. `_isValid` requires both imapHost
+  // and smtpHost non-empty, so both cases leave Save permanently disabled
+  // until Advanced setup is expanded — the caption must fire for both, not
+  // just the "discovered absolutely nothing" case.
+  bool get _discoveryIncomplete =>
+      _isNewAccount &&
+      (widget.discoveredConfig?.imapHost == null || widget.discoveredConfig?.smtpHost == null);
   bool get _isAppleId => _isNewAccount && isAppleIdDomain(widget.initialEmail ?? '');
 
   @override
@@ -213,6 +222,16 @@ class _AccountFormScreenState extends ConsumerState<AccountFormScreen> {
           TextField(key: const Key('displayNameField'), controller: _displayName,
               decoration: const InputDecoration(labelText: 'Display name')),
           TextField(key: const Key('emailField'), controller: _email,
+              // The email was already collected and validated (against the
+              // blocked-provider list) on Screen 1; letting it change here
+              // for a new account would silently desync `_isAppleId` and
+              // the default username/display name (all derived once from
+              // `widget.initialEmail` in initState) from what actually gets
+              // saved, and could bypass the Screen 1 block entirely (e.g.
+              // typing a normal address there, then switching to
+              // me@gmail.com here). Editing an existing account keeps this
+              // fully editable, as before.
+              readOnly: _isNewAccount,
               decoration: const InputDecoration(labelText: 'Email')),
           const SizedBox(height: 16),
           if (_showAdvancedFields) ...[
@@ -248,12 +267,12 @@ class _AccountFormScreenState extends ConsumerState<AccountFormScreen> {
             const SizedBox(height: 16),
             TextField(key: const Key('usernameField'), controller: _username,
                 decoration: const InputDecoration(labelText: 'Username')),
-          ] else if (_discoveryFoundNothing)
+          ] else if (_discoveryIncomplete)
             const Padding(
               padding: EdgeInsets.only(bottom: 8),
               child: Text(
-                "Couldn't detect your mail server settings automatically — tap "
-                "Advanced setup to enter them.",
+                "Some settings couldn't be detected automatically — tap "
+                "Advanced setup to review them.",
                 key: Key('discoveryFailedCaption'),
               ),
             ),

@@ -29,6 +29,26 @@ class _FakeIspdbDiscovery implements IspdbDiscovery {
   }
 }
 
+/// Throws on every lookup, simulating a real network failure (offline,
+/// captive portal, non-2xx from the DNS-over-HTTPS endpoint).
+class _ThrowingSrvResolver implements SrvResolver {
+  @override
+  Future<List<SrvTarget>> lookup(String serviceName) async {
+    throw Exception('DNS lookup failed for $serviceName');
+  }
+}
+
+/// Throws, simulating a real network failure in the ISPDB fallback path.
+class _ThrowingIspdbDiscovery implements IspdbDiscovery {
+  bool called = false;
+
+  @override
+  Future<DiscoveredMailConfig?> discover(String email) async {
+    called = true;
+    throw Exception('ISPDB discovery failed for $email');
+  }
+}
+
 void main() {
   test('iCloud domains use the hardcoded config and never touch DNS or ISPDB', () async {
     final srv = _FakeSrvResolver(const {});
@@ -138,6 +158,56 @@ void main() {
     final service = DefaultAccountDiscoveryService(
       srvResolver: _FakeSrvResolver(const {}),
       ispdbDiscovery: _FakeIspdbDiscovery(null),
+    );
+
+    expect(await service.discover('me@example.com'), isNull);
+  });
+
+  test('a throwing SRV resolver does not propagate and falls back to ISPDB', () async {
+    final ispdb = _FakeIspdbDiscovery(const DiscoveredMailConfig(
+      imapHost: 'ispdb-imap.example.com',
+      imapPort: 993,
+      imapSecurity: MailSecurity.ssl,
+      smtpHost: 'ispdb-smtp.example.com',
+      smtpPort: 587,
+      smtpSecurity: MailSecurity.startTls,
+    ));
+    final service = DefaultAccountDiscoveryService(
+      srvResolver: _ThrowingSrvResolver(),
+      ispdbDiscovery: ispdb,
+    );
+
+    final result = await service.discover('me@example.com');
+
+    expect(result, isNotNull);
+    expect(result!.imapHost, 'ispdb-imap.example.com');
+    expect(result.smtpHost, 'ispdb-smtp.example.com');
+    expect(ispdb.called, isTrue);
+  });
+
+  test('a throwing ISPDB fallback does not propagate; returns whatever SRV alone resolved', () async {
+    final srv = _FakeSrvResolver({
+      '_imaps._tcp.example.com': const [
+        SrvTarget(priority: 0, weight: 1, port: 993, target: 'srv.example.com'),
+      ],
+      // No outgoing SRV records, so the (throwing) ISPDB fallback will be
+      // consulted for the outgoing half.
+    });
+    final ispdb = _ThrowingIspdbDiscovery();
+    final service = DefaultAccountDiscoveryService(srvResolver: srv, ispdbDiscovery: ispdb);
+
+    final result = await service.discover('me@example.com');
+
+    expect(ispdb.called, isTrue);
+    expect(result, isNotNull);
+    expect(result!.imapHost, 'srv.example.com');
+    expect(result.smtpHost, isNull);
+  });
+
+  test('both SRV and ISPDB throwing does not propagate; returns null', () async {
+    final service = DefaultAccountDiscoveryService(
+      srvResolver: _ThrowingSrvResolver(),
+      ispdbDiscovery: _ThrowingIspdbDiscovery(),
     );
 
     expect(await service.discover('me@example.com'), isNull);

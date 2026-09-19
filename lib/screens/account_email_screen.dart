@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/mail_provider_rules.dart';
 import '../providers/repository_providers.dart';
+import '../services/discovered_mail_config.dart';
 import 'account_form_screen.dart';
 
 /// Screen 1 of new-account setup: a single email field. Blocks known dead
@@ -53,7 +54,18 @@ class _AccountEmailScreenState extends ConsumerState<AccountEmailScreen> {
       return;
     }
     setState(() => _checking = true);
-    final config = await ref.read(accountDiscoveryServiceProvider).discover(email);
+    // Defense in depth: DefaultAccountDiscoveryService already degrades
+    // network failures to a null result internally, but if something above
+    // that layer still throws, this screen must proceed exactly as it
+    // would for a clean null result rather than leaving `_checking` true
+    // forever (stuck spinner, Next never re-enabled, no recovery for the
+    // user).
+    DiscoveredMailConfig? config;
+    try {
+      config = await ref.read(accountDiscoveryServiceProvider).discover(email);
+    } catch (_) {
+      config = null;
+    }
     if (!mounted) return;
     setState(() => _checking = false);
     await Navigator.of(context).push(MaterialPageRoute(

@@ -21,6 +21,17 @@ class _FakeAccountDiscoveryService implements AccountDiscoveryService {
   }
 }
 
+/// Simulates a discovery service that throws instead of returning (defense
+/// in depth: even though DefaultAccountDiscoveryService itself degrades
+/// network failures to null internally, the screen must not get stuck if
+/// something above that layer still throws).
+class _ThrowingAccountDiscoveryService implements AccountDiscoveryService {
+  @override
+  Future<DiscoveredMailConfig?> discover(String email) async {
+    throw Exception('discovery blew up');
+  }
+}
+
 void main() {
   testWidgets('Next is disabled until the email looks valid', (tester) async {
     await tester.pumpWidget(const ProviderScope(
@@ -85,5 +96,30 @@ void main() {
 
     expect(fakeService.lastEmail, 'me@example.com');
     expect(find.byType(AccountFormScreen), findsOneWidget);
+  });
+
+  testWidgets(
+      'a discovery service that throws still navigates to AccountFormScreen with discoveredConfig null '
+      '(never leaves the screen stuck on "Looking up mail server settings…")', (tester) async {
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        accountDiscoveryServiceProvider.overrideWithValue(_ThrowingAccountDiscoveryService()),
+      ],
+      child: const MaterialApp(home: AccountEmailScreen()),
+    ));
+
+    await tester.enterText(find.byKey(const Key('emailField')), 'me@example.com');
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('nextButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AccountFormScreen), findsOneWidget);
+    expect(
+      tester.widget<AccountFormScreen>(find.byType(AccountFormScreen)).discoveredConfig,
+      isNull,
+    );
+    // Not stuck: the loading label is gone and the button reflects Screen
+    // 2 now, not a dead "Looking up..." state on Screen 1.
+    expect(find.byKey(const Key('discoveryLoadingLabel')), findsNothing);
   });
 }

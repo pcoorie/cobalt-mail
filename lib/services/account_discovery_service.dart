@@ -43,11 +43,39 @@ class DefaultAccountDiscoveryService implements AccountDiscoveryService {
     final domain = emailDomain(email);
     if (domain == null) return null;
 
-    var incoming = await _resolveIncoming(domain);
-    var outgoing = await _resolveOutgoing(domain);
+    // Each lookup is wrapped individually so a failure in one (offline,
+    // captive portal, non-2xx from the DNS-over-HTTPS endpoint, etc.)
+    // doesn't stop the other from being attempted, and doesn't propagate
+    // out of discover() — a network failure here must degrade to
+    // "unresolved" (same as no record found), never crash the whole
+    // discovery flow. Catching Object (rather than just Exception) is
+    // deliberate: basic_utils/enough_mail's exact throw types for network
+    // failures aren't pinned down, and the whole point of this boundary is
+    // "any failure here degrades gracefully" — but see the ISPDB site below
+    // for the same reasoning.
+    _ResolvedServer? incoming;
+    try {
+      incoming = await _resolveIncoming(domain);
+    } catch (_) {
+      incoming = null;
+    }
+    _ResolvedServer? outgoing;
+    try {
+      outgoing = await _resolveOutgoing(domain);
+    } catch (_) {
+      outgoing = null;
+    }
 
     if (incoming == null || outgoing == null) {
-      final fallback = await _ispdbDiscovery.discover(email);
+      DiscoveredMailConfig? fallback;
+      try {
+        // Same reasoning as above: the ISPDB fallback does real network
+        // I/O (enough_mail's `Discover.discover`), and any failure there
+        // must be treated as "nothing found", not propagate.
+        fallback = await _ispdbDiscovery.discover(email);
+      } catch (_) {
+        fallback = null;
+      }
       incoming ??= _asResolvedIncoming(fallback);
       outgoing ??= _asResolvedOutgoing(fallback);
     }
