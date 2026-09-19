@@ -10,6 +10,7 @@ import '../data/transport/enough_mail_sender.dart';
 import '../data/transport/enough_mail_transport.dart';
 import '../data/transport/mail_sender.dart';
 import '../data/transport/mail_transport.dart';
+import '../services/account_discovery_service.dart';
 import 'database_providers.dart';
 
 final credentialStoreProvider = Provider<SecureCredentialStore>((ref) => SecureCredentialStore());
@@ -17,6 +18,8 @@ final credentialStoreProvider = Provider<SecureCredentialStore>((ref) => SecureC
 final mailTransportProvider = Provider<MailTransport>((ref) => EnoughMailTransport());
 
 final mailSenderProvider = Provider<MailSender>((ref) => EnoughMailSender());
+
+final accountDiscoveryServiceProvider = Provider<AccountDiscoveryService>((ref) => DefaultAccountDiscoveryService());
 
 final accountRepositoryProvider = FutureProvider<AccountRepository>((ref) async {
   final db = await ref.watch(databaseProvider.future);
