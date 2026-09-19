@@ -14,9 +14,14 @@ at all.**
 - **Gmail**: Google removed Basic Authentication for IMAP/SMTP/POP entirely
   in 2026. There is no password, app-specific or otherwise, that works —
   only OAuth2, which this app doesn't implement.
+- **Outlook/Hotmail**: Microsoft has deprecated Basic Authentication for
+  IMAP/SMTP/POP for both organizational (Exchange Online) and personal
+  (outlook.com/hotmail.com/live.com/msn.com) accounts, pushing everything
+  to OAuth2 — same dead end as Gmail, no password of any kind works.
 - **iCloud**: Apple requires an app-specific password, generated at
   `appleid.apple.com`, for any third-party IMAP client. The regular Apple ID
-  password is rejected.
+  password is rejected — but this one *does* work, since the app-specific
+  password is still plain-password auth as far as IMAP/SMTP is concerned.
 - **Fastmail**: never accepts the account's master password for IMAP/SMTP —
   an app password is mandatory.
 
@@ -41,8 +46,10 @@ returns actual hostnames/ports rather than guessing common patterns.
   hardcoded table.
 - iCloud is special-cased only for the one thing that can't be discovered:
   the requirement for an app-specific password, made unmissable in the UI.
-- Gmail is blocked outright, before the user wastes effort on a form that
-  cannot possibly succeed.
+- Gmail and Outlook/Hotmail are blocked outright, before the user wastes
+  effort on a form that cannot possibly succeed. In practice this leaves
+  two supported paths: iCloud (app-specific password), or plain IMAP with
+  a real account/app password on any other domain.
 - Editing an existing account is unaffected — full manual form, unchanged
   (already the behavior after #5's fix).
 
@@ -53,8 +60,9 @@ returns actual hostnames/ports rather than guessing common patterns.
   verification is costly, Outlook/Exchange has its own registration
   overhead, and iCloud has no public OAuth path for third-party IMAP at
   all, so OAuth wouldn't even fully solve the problem).
-- No special-casing for Outlook or Fastmail beyond what generic discovery
-  finds for them.
+- No special-casing for Fastmail beyond what generic discovery finds for
+  it. Outlook/Hotmail gets no *setup* special-casing either — it's blocked
+  entirely (§4), not routed through discovery at all.
 - No change to the account **editing** flow.
 
 ## 4. Flow
@@ -63,13 +71,20 @@ returns actual hostnames/ports rather than guessing common patterns.
 
 - Single email field + "Next" (disabled until the input looks like a valid
   email address).
-- **Gmail block**: if the domain is `gmail.com` or `googlemail.com`, "Next"
-  leads to an inline blocking message on this same screen — not a
-  navigation forward, not the manual form:
-  > "Gmail isn't supported. Google removed plain sign-in for apps like this
-  > in 2026, and this app doesn't support Google's newer sign-in method yet.
-  > Try a different email address."
-  There is no path forward from this state except changing the email.
+- **Blocked-provider check**: if the domain matches one of the two known
+  dead ends, "Next" leads to an inline blocking message on this same
+  screen — not a navigation forward, not the manual form:
+  - `gmail.com`, `googlemail.com`:
+    > "Gmail isn't supported. Google removed plain sign-in for apps like
+    > this in 2026, and this app doesn't support Google's newer sign-in
+    > method yet. Try a different email address."
+  - `outlook.com`, `hotmail.com`, `live.com`, `msn.com`:
+    > "Outlook and Hotmail aren't supported. Microsoft has moved these
+    > accounts to a sign-in method this app doesn't support yet. Try a
+    > different email address."
+  There is no path forward from either state except changing the email —
+  no Advanced setup escape hatch, since a real password genuinely cannot
+  work for these domains.
 - Otherwise, tapping "Next" shows a brief loading state ("Looking up mail
   server settings…") while discovery runs (§5), then navigates to Screen 2
   regardless of whether discovery found anything.
@@ -109,8 +124,8 @@ returns actual hostnames/ports rather than guessing common patterns.
 
 ## 5. Discovery algorithm
 
-Given an email address (already past the Gmail block), in order, first
-match wins:
+Given an email address (already past the blocked-provider check), in
+order, first match wins:
 
 1. **iCloud special case** — domain is `icloud.com`/`me.com`/`mac.com`:
    use the existing hardcoded config (`imap.mail.me.com:993` SSL /
@@ -168,10 +183,15 @@ imported from app code rather than relying on transitive resolution.
   with a small `isAppleIdDomain(String email)` helper plus the hardcoded
   iCloud host/port/security constants — whichever reads cleaner once
   written (implementation detail, not a design decision).
-- `isUnsupportedGmailDomain(String email)` (new, small pure function,
-  likely alongside the iCloud helper): matches `gmail.com`/`googlemail.com`.
-- New screen `lib/screens/account_email_screen.dart` (Screen 1: email input,
-  Gmail block, discovery loading state).
+- `detectBlockedProvider(String email)` (new, small pure function, likely
+  alongside the iCloud helper): returns an enum
+  (`BlockedProvider.gmail`/`.outlookHotmail`) or `null`. Matches
+  `gmail.com`/`googlemail.com` for Gmail and
+  `outlook.com`/`hotmail.com`/`live.com`/`msn.com` for Outlook/Hotmail —
+  the same four domains dropped from the old preset table in commit
+  `48f0dc8`, now used to block rather than to configure.
+- New screen `lib/screens/account_email_screen.dart` (Screen 1: email
+  input, blocked-provider message, discovery loading state).
 - `lib/screens/account_form_screen.dart` becomes Screen 2 for the
   *new-account* path (receives the `DiscoveredMailConfig?` and email as
   constructor input instead of driving discovery itself via the
@@ -194,11 +214,12 @@ imported from app code rather than relying on transitive resolution.
   handling) gets direct unit tests against a fake `DnsUtils`-shaped
   resolver, not real DNS — real SRV records for real domains can change
   out from under a test suite.
-- `AccountEmailScreen` widget tests: Gmail domain shows the block message
-  and never navigates forward; a domain whose fake discovery result
-  resolves fully navigates to Screen 2 with fields hidden; a domain whose
-  fake result is null navigates to Screen 2 with Advanced setup collapsed
-  and the "couldn't detect" caption shown.
+- `AccountEmailScreen` widget tests: a Gmail domain and an Outlook/Hotmail
+  domain each show their respective block message and never navigate
+  forward (and show no Advanced-setup escape hatch); a domain whose fake
+  discovery result resolves fully navigates to Screen 2 with fields
+  hidden; a domain whose fake result is null navigates to Screen 2 with
+  Advanced setup collapsed and the "couldn't detect" caption shown.
 - `AccountFormScreen` (Screen 2) tests updated: replace the removed
   per-keystroke email-listener tests from commit `48f0dc8`
   (`test/widget/account_form_screen_test.dart`) with tests driven by the
