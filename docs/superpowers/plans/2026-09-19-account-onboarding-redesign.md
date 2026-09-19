@@ -404,12 +404,16 @@ void main() {
         hostname: 'imap.example.com',
         port: 993,
         socketType: enough.SocketType.ssl,
+        authentication: enough.Authentication.plain,
+        usernameType: enough.UsernameType.emailAddress,
       ),
       outgoing: enough.ServerConfig(
         type: enough.ServerType.smtp,
         hostname: 'smtp.example.com',
         port: 587,
         socketType: enough.SocketType.starttls,
+        authentication: enough.Authentication.plain,
+        usernameType: enough.UsernameType.emailAddress,
       ),
     );
 
@@ -431,6 +435,8 @@ void main() {
         hostname: 'imap.example.com',
         port: 993,
         socketType: enough.SocketType.ssl,
+        authentication: enough.Authentication.plain,
+        usernameType: enough.UsernameType.emailAddress,
       ),
     );
 
