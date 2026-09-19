@@ -18,6 +18,7 @@ import 'package:imap_mail/providers/repository_providers.dart';
 import 'package:imap_mail/providers/send_sound_providers.dart';
 import 'package:imap_mail/screens/compose_screen.dart';
 import 'package:imap_mail/services/send_sound_player.dart';
+import 'package:imap_mail/theme/brand_colors.dart';
 
 class _FakeAccountsNotifier extends AccountsNotifier {
   _FakeAccountsNotifier(this._accounts);
@@ -99,6 +100,19 @@ void main() {
     await tester.pump();
 
     expect(tester.widget<ElevatedButton>(sendButtonFinder).onPressed, isNotNull);
+  });
+
+  testWidgets('Send button uses the brand color, not a hardcoded blue', (tester) async {
+    _growViewport(tester);
+    await tester.pumpWidget(const ProviderScope(
+      child: MaterialApp(home: ComposeScreen(accountId: 1)),
+    ));
+
+    final sendButtonFinder = find.widgetWithText(ElevatedButton, 'Send');
+    final button = tester.widget<ElevatedButton>(sendButtonFinder);
+    final resolvedColor = button.style?.backgroundColor?.resolve(<WidgetState>{});
+
+    expect(resolvedColor, brandSeed);
   });
 
   testWidgets('Bcc is optional and does not block Send once required fields are filled', (tester) async {

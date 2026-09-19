@@ -15,6 +15,7 @@ import '../providers/filesystem_providers.dart';
 import '../providers/message_providers.dart';
 import '../providers/repository_providers.dart';
 import '../providers/send_sound_providers.dart';
+import '../theme/brand_colors.dart';
 import '../utils/html_text.dart';
 
 /// The body text to quote when forwarding [message]: its plain-text part
@@ -253,7 +254,7 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
           ElevatedButton(
             onPressed: _isValid && !_sending ? _send : null,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF1E88E5),
+              backgroundColor: brandSeed,
               foregroundColor: Colors.white,
             ),
             child: Text(_sending ? 'Sending...' : 'Send'),
