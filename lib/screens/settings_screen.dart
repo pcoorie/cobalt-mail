@@ -4,6 +4,7 @@ import '../models/swipe_action.dart';
 import '../providers/account_providers.dart';
 import '../providers/swipe_action_providers.dart';
 import '../providers/theme_providers.dart';
+import 'account_email_screen.dart';
 import 'account_form_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -42,7 +43,7 @@ class SettingsScreen extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.add),
             onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const AccountFormScreen()),
+              MaterialPageRoute(builder: (_) => const AccountEmailScreen()),
             ),
           ),
         ],

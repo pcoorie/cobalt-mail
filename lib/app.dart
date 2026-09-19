@@ -5,7 +5,7 @@ import 'providers/badge_providers.dart';
 import 'providers/theme_providers.dart';
 import 'providers/unified_inbox_providers.dart';
 import 'screens/account_list_screen.dart';
-import 'screens/account_form_screen.dart';
+import 'screens/account_email_screen.dart';
 import 'screens/folder_view_screen.dart';
 import 'theme/brand_colors.dart';
 
@@ -71,7 +71,7 @@ class _ImapMailAppState extends ConsumerState<ImapMailApp> {
           final accountsAsync = ref.watch(accountsProvider);
           return accountsAsync.when(
             data: (accounts) => switch (accounts.length) {
-              0 => const AccountFormScreen(),
+              0 => const AccountEmailScreen(),
               1 => FolderViewScreen(accountId: accounts.single.id!),
               _ => const AccountListScreen(),
             },
