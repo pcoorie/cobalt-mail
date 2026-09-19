@@ -10,6 +10,7 @@ Most consumer mail apps either force you through a provider's OAuth flow or funn
 
 ### Mail, done properly
 - **Multi-account** — add as many IMAP/SMTP accounts as you like, each configured manually (host, port, security, credentials).
+- **Automatic server discovery, including iCloud Mail** — type your email address and Cobalt Mail looks up the right IMAP/SMTP host, port, and security settings for you (RFC 6186 DNS SRV, falling back to ISPDB/autoconfig). iCloud Mail is built in directly, since Apple doesn't publish those records — just enter your `@icloud.com`, `@me.com`, or `@mac.com` address and an app-specific password. Gmail and Outlook/Hotmail are detected up front and flagged as unsupported, since both now require an OAuth sign-in this app doesn't do.
 - **Unified Inbox** — every account's Inbox merged into one chronological view, with a per-account color indicator on each row so you always know where a message came from. Drill into a single account's full folder tree whenever you want.
 - **Full folder access** — Inbox, Sent, and Trash front and center, with every other folder your server reports (Archive, custom labels, etc.) one tap away.
 - **Compose, reply, and forward**, with file attachments, sent straight over SMTP.

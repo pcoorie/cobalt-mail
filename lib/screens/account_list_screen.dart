@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/account_providers.dart';
 import '../providers/unified_inbox_providers.dart';
-import 'account_form_screen.dart';
+import 'account_email_screen.dart';
 import 'folder_view_screen.dart';
 import 'settings_screen.dart';
 import 'unified_inbox_screen.dart';
@@ -19,7 +19,7 @@ class AccountListScreen extends ConsumerWidget {
         IconButton(
           icon: const Icon(Icons.add),
           onPressed: () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const AccountFormScreen()),
+            MaterialPageRoute(builder: (_) => const AccountEmailScreen()),
           ),
         ),
         IconButton(

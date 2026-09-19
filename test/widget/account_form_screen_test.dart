@@ -5,6 +5,7 @@ import 'package:imap_mail/models/enums.dart';
 import 'package:imap_mail/models/mail_account.dart';
 import 'package:imap_mail/providers/account_providers.dart';
 import 'package:imap_mail/screens/account_form_screen.dart';
+import 'package:imap_mail/services/discovered_mail_config.dart';
 
 class _RecordingAccountsNotifier extends AccountsNotifier {
   _RecordingAccountsNotifier(this._accounts);
@@ -44,16 +45,20 @@ void main() {
 
   testWidgets('Save button is disabled until required fields are filled', (tester) async {
     await useTallSurface(tester);
+    // The email field is read-only for new accounts (Finding 2: it was
+    // already collected and validated on Screen 1), so the email here
+    // comes in via initialEmail rather than being typed into the field.
     await tester.pumpWidget(const ProviderScope(
-      child: MaterialApp(home: AccountFormScreen()),
+      child: MaterialApp(home: AccountFormScreen(initialEmail: 'me@example.com')),
     ));
+    await tester.tap(find.byKey(const Key('advancedSetupToggle')));
+    await tester.pump();
 
     final saveButtonFinder = find.widgetWithText(ElevatedButton, 'Save');
     ElevatedButton saveButton() => tester.widget(saveButtonFinder);
     expect(saveButton().onPressed, isNull);
 
     await tester.enterText(find.byKey(const Key('displayNameField')), 'Work');
-    await tester.enterText(find.byKey(const Key('emailField')), 'me@example.com');
     await tester.enterText(find.byKey(const Key('imapHostField')), 'imap.example.com');
     await tester.enterText(find.byKey(const Key('imapPortField')), '993');
     await tester.enterText(find.byKey(const Key('smtpHostField')), 'smtp.example.com');
@@ -78,6 +83,8 @@ void main() {
     await tester.pumpWidget(const ProviderScope(
       child: MaterialApp(home: AccountFormScreen()),
     ));
+    await tester.tap(find.byKey(const Key('advancedSetupToggle')));
+    await tester.pump();
 
     final imapDropdownFinder = find.byKey(const Key('imapSecurityDropdown'));
     final smtpDropdownFinder = find.byKey(const Key('smtpSecurityDropdown'));
@@ -162,14 +169,16 @@ void main() {
       overrides: [
         accountsProvider.overrideWith(() => notifier),
       ],
-      // Mirrors app.dart: when there are zero accounts, AccountFormScreen is
-      // used directly as MaterialApp.home — not pushed via Navigator.push.
-      // There is therefore no previous route to pop back to.
-      child: const MaterialApp(home: AccountFormScreen()),
+      // Regression coverage for AccountFormScreen being used directly as
+      // MaterialApp.home with no previous route to pop back to. The email
+      // field is read-only for new accounts (Finding 2), so it comes in
+      // via initialEmail here rather than being typed into the field.
+      child: const MaterialApp(home: AccountFormScreen(initialEmail: 'me@example.com')),
     ));
+    await tester.tap(find.byKey(const Key('advancedSetupToggle')));
+    await tester.pump();
 
     await tester.enterText(find.byKey(const Key('displayNameField')), 'Work');
-    await tester.enterText(find.byKey(const Key('emailField')), 'me@example.com');
     await tester.enterText(find.byKey(const Key('imapHostField')), 'imap.example.com');
     await tester.enterText(find.byKey(const Key('imapPortField')), '993');
     await tester.enterText(find.byKey(const Key('smtpHostField')), 'smtp.example.com');
@@ -207,5 +216,190 @@ void main() {
 
     expect(notifier.updateCalled, isTrue);
     expect(notifier.lastUpdatedPassword, 'new-password');
+  });
+
+  testWidgets('new account: Advanced setup is always collapsed by default', (tester) async {
+    await useTallSurface(tester);
+    await tester.pumpWidget(const ProviderScope(
+      child: MaterialApp(home: AccountFormScreen()),
+    ));
+
+    expect(find.byKey(const Key('imapHostField')), findsNothing);
+    expect(find.byKey(const Key('usernameField')), findsNothing);
+    expect(find.byKey(const Key('advancedSetupToggle')), findsOneWidget);
+  });
+
+  testWidgets('new account: an iCloud email shows the App-Specific Password label, hint, and link',
+      (tester) async {
+    await useTallSurface(tester);
+    await tester.pumpWidget(const ProviderScope(
+      child: MaterialApp(home: AccountFormScreen(
+        initialEmail: 'me@icloud.com',
+        discoveredConfig: DiscoveredMailConfig(
+          imapHost: 'imap.mail.me.com',
+          imapPort: 993,
+          imapSecurity: MailSecurity.ssl,
+          smtpHost: 'smtp.mail.me.com',
+          smtpPort: 587,
+          smtpSecurity: MailSecurity.startTls,
+        ),
+      )),
+    ));
+
+    expect(find.text('App-Specific Password'), findsOneWidget);
+    expect(find.byKey(const Key('appSpecificPasswordHint')), findsOneWidget);
+    expect(find.byKey(const Key('appSpecificPasswordLink')), findsOneWidget);
+    expect(find.byKey(const Key('imapHostField')), findsNothing);
+  });
+
+  testWidgets('new account: a non-Apple email shows the plain Password label, no App-Specific hint',
+      (tester) async {
+    await useTallSurface(tester);
+    await tester.pumpWidget(const ProviderScope(
+      child: MaterialApp(home: AccountFormScreen(
+        initialEmail: 'me@example.com',
+        discoveredConfig: DiscoveredMailConfig(
+          imapHost: 'imap.example.com',
+          imapPort: 993,
+          imapSecurity: MailSecurity.ssl,
+          smtpHost: 'smtp.example.com',
+          smtpPort: 465,
+          smtpSecurity: MailSecurity.ssl,
+        ),
+      )),
+    ));
+
+    expect(find.text('Password'), findsOneWidget);
+    expect(find.byKey(const Key('appSpecificPasswordHint')), findsNothing);
+    expect(find.byKey(const Key('discoveryFailedCaption')), findsNothing);
+  });
+
+  testWidgets('new account: no discovered config shows the failure caption, still collapsed',
+      (tester) async {
+    await useTallSurface(tester);
+    await tester.pumpWidget(const ProviderScope(
+      child: MaterialApp(home: AccountFormScreen(initialEmail: 'me@example.com')),
+    ));
+
+    expect(find.byKey(const Key('discoveryFailedCaption')), findsOneWidget);
+    expect(find.byKey(const Key('imapHostField')), findsNothing);
+  });
+
+  testWidgets('new account: expanding Advanced setup pre-fills a partial discovered config, blank for the rest',
+      (tester) async {
+    await useTallSurface(tester);
+    await tester.pumpWidget(const ProviderScope(
+      child: MaterialApp(home: AccountFormScreen(
+        initialEmail: 'me@example.com',
+        discoveredConfig: DiscoveredMailConfig(
+          imapHost: 'imap.example.com',
+          imapPort: 993,
+          imapSecurity: MailSecurity.ssl,
+        ),
+      )),
+    ));
+
+    // A partial discovery result (IMAP resolved, SMTP not) still leaves the
+    // form unsavable without expanding Advanced setup, so the caption must
+    // appear here too, not just for a fully-null config.
+    expect(find.byKey(const Key('discoveryFailedCaption')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('advancedSetupToggle')));
+    await tester.pump();
+
+    expect(tester.widget<TextField>(find.byKey(const Key('imapHostField'))).controller!.text,
+        'imap.example.com');
+    expect(tester.widget<TextField>(find.byKey(const Key('smtpHostField'))).controller!.text, isEmpty);
+    expect(tester.widget<TextField>(find.byKey(const Key('usernameField'))).controller!.text,
+        'me@example.com');
+  });
+
+  testWidgets('new account: saving with a fully discovered config works without expanding Advanced setup',
+      (tester) async {
+    await useTallSurface(tester);
+    final notifier = _RecordingAccountsNotifier([]);
+    await tester.pumpWidget(ProviderScope(
+      overrides: [accountsProvider.overrideWith(() => notifier)],
+      child: const MaterialApp(home: AccountFormScreen(
+        initialEmail: 'me@example.com',
+        discoveredConfig: DiscoveredMailConfig(
+          imapHost: 'imap.example.com',
+          imapPort: 993,
+          imapSecurity: MailSecurity.ssl,
+          smtpHost: 'smtp.example.com',
+          smtpPort: 465,
+          smtpSecurity: MailSecurity.ssl,
+        ),
+      )),
+    ));
+
+    await tester.enterText(find.byKey(const Key('passwordField')), 'app-password');
+    await tester.pump();
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Save'));
+    await tester.pump();
+    await tester.pump();
+
+    expect(notifier.addCalled, isTrue);
+  });
+
+  testWidgets('new account: the email field is read-only (Screen 1 already collected and validated it)',
+      (tester) async {
+    await useTallSurface(tester);
+    await tester.pumpWidget(const ProviderScope(
+      child: MaterialApp(home: AccountFormScreen(initialEmail: 'me@example.com')),
+    ));
+
+    final emailField = tester.widget<TextField>(find.byKey(const Key('emailField')));
+    expect(emailField.readOnly, isTrue);
+
+    // Attempting to type into it must not change its text — readOnly
+    // blocks keyboard input, unlike merely disabling the field visually.
+    await tester.enterText(find.byKey(const Key('emailField')), 'me@gmail.com');
+    await tester.pump();
+    expect(emailField.controller!.text, 'me@example.com');
+  });
+
+  testWidgets('editing an existing account: the email field remains fully editable', (tester) async {
+    await useTallSurface(tester);
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        accountsProvider.overrideWith(() => _RecordingAccountsNotifier([existingAccount])),
+      ],
+      child: const MaterialApp(home: AccountFormScreen(existing: existingAccount)),
+    ));
+
+    final emailField = tester.widget<TextField>(find.byKey(const Key('emailField')));
+    expect(emailField.readOnly, isFalse);
+
+    await tester.enterText(find.byKey(const Key('emailField')), 'changed@example.com');
+    await tester.pump();
+    expect(emailField.controller!.text, 'changed@example.com');
+  });
+
+  testWidgets('editing an existing account shows the full form even with a recognized email domain',
+      (tester) async {
+    await useTallSurface(tester);
+    const gmailAccount = MailAccount(
+      id: 2,
+      displayName: 'Personal',
+      email: 'me@gmail.com',
+      imapHost: 'imap.gmail.com',
+      imapPort: 993,
+      imapSecurity: MailSecurity.ssl,
+      smtpHost: 'smtp.gmail.com',
+      smtpPort: 465,
+      smtpSecurity: MailSecurity.ssl,
+      username: 'me@gmail.com',
+    );
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        accountsProvider.overrideWith(() => _RecordingAccountsNotifier([gmailAccount])),
+      ],
+      child: const MaterialApp(home: AccountFormScreen(existing: gmailAccount)),
+    ));
+
+    expect(find.byKey(const Key('imapHostField')), findsOneWidget);
+    expect(find.byKey(const Key('usernameField')), findsOneWidget);
+    expect(find.byKey(const Key('advancedSetupToggle')), findsNothing);
   });
 }

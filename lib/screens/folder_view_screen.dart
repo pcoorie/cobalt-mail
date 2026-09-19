@@ -40,6 +40,7 @@ class FolderViewScreen extends ConsumerStatefulWidget {
 class _FolderViewScreenState extends ConsumerState<FolderViewScreen> {
   MailFolder? _selected;
   bool _selecting = false;
+  bool _unreadOnly = false;
   final Set<int> _selectedIds = {};
 
   // See _showAutoDismissingSnackBar's doc comment for why this exists —
@@ -190,6 +191,11 @@ class _FolderViewScreenState extends ConsumerState<FolderViewScreen> {
     return AppBar(
       title: const Text('Mail'),
       actions: [
+        IconButton(
+          icon: Icon(_unreadOnly ? Icons.mark_email_unread : Icons.mark_email_unread_outlined),
+          tooltip: _unreadOnly ? 'Show all messages' : 'Show unread only',
+          onPressed: () => setState(() => _unreadOnly = !_unreadOnly),
+        ),
         IconButton(
           icon: const Icon(Icons.search),
           onPressed: () => Navigator.of(
@@ -347,6 +353,7 @@ class _FolderViewScreenState extends ConsumerState<FolderViewScreen> {
                     folder: current,
                     selecting: _selecting,
                     selectedIds: _selectedIds,
+                    unreadOnly: _unreadOnly,
                     onEnterSelection: _enterSelection,
                     onToggleSelection: _toggleSelection,
                   ),
@@ -383,6 +390,7 @@ class _MessageList extends ConsumerStatefulWidget {
     required this.folder,
     required this.selecting,
     required this.selectedIds,
+    required this.unreadOnly,
     required this.onEnterSelection,
     required this.onToggleSelection,
   });
@@ -390,6 +398,7 @@ class _MessageList extends ConsumerStatefulWidget {
   final MailFolder folder;
   final bool selecting;
   final Set<int> selectedIds;
+  final bool unreadOnly;
   final ValueChanged<int> onEnterSelection;
   final ValueChanged<int> onToggleSelection;
 
@@ -443,9 +452,12 @@ class _MessageListState extends ConsumerState<_MessageList> {
         // next selection change triggers a rebuild — acceptable for this
         // rare edge case (a sync/refresh removing a selected message).
         widget.selectedIds.retainAll(messages.map((m) => m.id).whereType<int>());
-        final visible = messages
+        final withoutPending = messages
             .where((m) => !_pendingRemoval.contains(m.id))
             .toList();
+        final visible = widget.unreadOnly
+            ? withoutPending.where((m) => !m.isRead).toList()
+            : withoutPending;
         // Only needed once there's an actual row to build (never touched by
         // an empty folder), and only watched here — not unconditionally at
         // the top of build — so an empty folder never needs accountsProvider
@@ -482,7 +494,9 @@ class _MessageListState extends ConsumerState<_MessageList> {
                       SizedBox(
                         height: constraints.maxHeight,
                         child: EmptyFolderState(
-                          message: 'No messages in ${folder.name}',
+                          message: withoutPending.isEmpty
+                              ? 'No messages in ${folder.name}'
+                              : 'No unread messages in ${folder.name}',
                         ),
                       ),
                     ],
