@@ -42,6 +42,7 @@ class _AccountFormScreenState extends ConsumerState<AccountFormScreen> {
   bool _testing = false;
   bool _saving = false;
   bool _advancedExpanded = false;
+  bool _obscurePassword = true;
 
   bool get _isNewAccount => widget.existing == null;
   bool get _showAdvancedFields => !_isNewAccount || _advancedExpanded;
@@ -188,8 +189,15 @@ class _AccountFormScreenState extends ConsumerState<AccountFormScreen> {
     final passwordField = TextField(
       key: const Key('passwordField'),
       controller: _password,
-      obscureText: true,
-      decoration: InputDecoration(labelText: _isAppleId ? 'App-Specific Password' : 'Password'),
+      obscureText: _obscurePassword,
+      decoration: InputDecoration(
+        labelText: _isAppleId ? 'App-Specific Password' : 'Password',
+        suffixIcon: IconButton(
+          icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
+          tooltip: _obscurePassword ? 'Show password' : 'Hide password',
+          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+        ),
+      ),
     );
     if (!_isAppleId) return passwordField;
     return Column(

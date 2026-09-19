@@ -70,6 +70,31 @@ void main() {
     expect(saveButton().onPressed, isNotNull);
   });
 
+  testWidgets('password field has a show/hide visibility toggle', (tester) async {
+    await useTallSurface(tester);
+    await tester.pumpWidget(const ProviderScope(
+      child: MaterialApp(home: AccountFormScreen(initialEmail: 'me@example.com')),
+    ));
+
+    final passwordFieldFinder = find.byKey(const Key('passwordField'));
+    bool obscured() => tester.widget<TextField>(passwordFieldFinder).obscureText;
+
+    expect(obscured(), isTrue);
+    expect(find.byTooltip('Show password'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Show password'));
+    await tester.pump();
+
+    expect(obscured(), isFalse);
+    expect(find.byTooltip('Hide password'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Hide password'));
+    await tester.pump();
+
+    expect(obscured(), isTrue);
+    expect(find.byTooltip('Show password'), findsOneWidget);
+  });
+
   testWidgets('shows a Test connection button', (tester) async {
     await useTallSurface(tester);
     await tester.pumpWidget(const ProviderScope(
