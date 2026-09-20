@@ -60,6 +60,10 @@ dependencies:
   # Already resolved transitively — declared directly now that
   # SettingsScreen also uses it to show the app version/build number.
   package_info_plus: ^10.2.1
+  # Also used at runtime (main.dart calls preserve/remove to hold the native
+  # splash on screen a beat longer), not just for `dart run
+  # flutter_native_splash:create` codegen — so it's a real dependency.
+  flutter_native_splash: ^2.4.6
 
 dev_dependencies:
   flutter_test:
@@ -74,7 +78,6 @@ dev_dependencies:
   sqflite_common_ffi: ^2.4.0+3
   mocktail: ^1.0.5
   flutter_launcher_icons: ^0.14.4
-  flutter_native_splash: ^2.4.6
 
 # Locally patched copy of enough_mail 2.1.7 — fixes a real upstream bug
 # (UID vs. sequence-number mismatch between the COPY and STORE \Deleted

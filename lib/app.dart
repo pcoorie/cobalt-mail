@@ -14,9 +14,9 @@ import 'theme/brand_colors.dart';
 /// rather than a scheme-derived tone so it stays the exact same blue as the
 /// app icon in both light and dark mode.
 AppBarTheme _appBarTheme() => const AppBarTheme(
-      backgroundColor: brandSeed,
-      foregroundColor: Colors.white,
-    );
+  backgroundColor: brandSeed,
+  foregroundColor: Colors.white,
+);
 
 class ImapMailApp extends ConsumerStatefulWidget {
   const ImapMailApp({super.key});
@@ -39,7 +39,10 @@ class _ImapMailAppState extends ConsumerState<ImapMailApp> {
     // `fireImmediately`. This registers the listener once for the app's
     // whole lifetime; the subscription is disposed automatically when this
     // widget is disposed, so no explicit cleanup is needed in `dispose()`.
-    ref.listenManual<AsyncValue<int>>(totalUnreadCountProvider, (previous, next) {
+    ref.listenManual<AsyncValue<int>>(totalUnreadCountProvider, (
+      previous,
+      next,
+    ) {
       final count = next.valueOrNull;
       if (count != null) {
         ref.read(appIconBadgeProvider).setCount(count);
@@ -51,7 +54,10 @@ class _ImapMailAppState extends ConsumerState<ImapMailApp> {
   Widget build(BuildContext context) {
     final themeMode = ref.watch(themeModeProvider);
     final lightScheme = ColorScheme.fromSeed(seedColor: brandSeed);
-    final darkScheme = ColorScheme.fromSeed(seedColor: brandSeed, brightness: Brightness.dark);
+    final darkScheme = ColorScheme.fromSeed(
+      seedColor: brandSeed,
+      brightness: Brightness.dark,
+    );
     return MaterialApp(
       title: 'Cobalt Mail',
       debugShowCheckedModeBanner: false,
@@ -75,7 +81,9 @@ class _ImapMailAppState extends ConsumerState<ImapMailApp> {
               1 => FolderViewScreen(accountId: accounts.single.id!),
               _ => const AccountListScreen(),
             },
-            loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+            loading: () => const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            ),
             error: (error, _) => Scaffold(
               body: Center(child: Text('Failed to load accounts: $error')),
             ),
