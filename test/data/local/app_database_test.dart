@@ -226,4 +226,77 @@ void main() {
     final rows = await db.query('messages', where: 'id = ?', whereArgs: [messageId]);
     expect(rows.first['from_name'], 'Alice');
   });
+
+  test('onUpgrade from version 3 adds message_count without losing existing data', () async {
+    final dir = await Directory.systemTemp.createTemp('imap_mail_migration_test');
+    addTearDown(() => dir.delete(recursive: true));
+    final path = p.join(dir.path, 'test.db');
+
+    // Simulate a pre-migration (version 3) database using the schema
+    // AppDatabase.onCreate produced before message_count existed.
+    final oldDb = await databaseFactory.openDatabase(
+      path,
+      options: OpenDatabaseOptions(
+        version: 3,
+        onCreate: (db, version) async {
+          await db.execute('''
+            CREATE TABLE folders (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              account_id INTEGER NOT NULL,
+              name TEXT NOT NULL,
+              path TEXT NOT NULL,
+              type TEXT NOT NULL,
+              unread_count INTEGER NOT NULL DEFAULT 0,
+              is_local_only INTEGER NOT NULL DEFAULT 0,
+              last_synced_uid INTEGER NOT NULL DEFAULT 0
+            )
+          ''');
+        },
+      ),
+    );
+    final folderId = await oldDb.insert('folders', {
+      'account_id': 1,
+      'name': 'Drafts',
+      'path': 'Drafts',
+      'type': 'other',
+    });
+    await oldDb.close();
+
+    final upgradedDb = await databaseFactory.openDatabase(
+      path,
+      options: OpenDatabaseOptions(
+        version: 4,
+        onCreate: AppDatabase.onCreate,
+        onUpgrade: AppDatabase.onUpgrade,
+      ),
+    );
+    addTearDown(upgradedDb.close);
+
+    final rows = await upgradedDb.query('folders', where: 'id = ?', whereArgs: [folderId]);
+    expect(rows, hasLength(1));
+    expect(rows.first['message_count'], 0);
+    expect(rows.first['name'], 'Drafts');
+  });
+
+  test('a fresh (onCreate) database already has the message_count column', () async {
+    final db = await databaseFactory.openDatabase(
+      inMemoryDatabasePath,
+      options: OpenDatabaseOptions(version: 4, onCreate: AppDatabase.onCreate),
+    );
+    addTearDown(db.close);
+
+    final folderId = await db.insert('folders', {
+      'account_id': 1,
+      'name': 'Drafts',
+      'path': 'Drafts',
+      'type': 'drafts',
+      'unread_count': 0,
+      'is_local_only': 0,
+      'last_synced_uid': 0,
+      'message_count': 3,
+    });
+
+    final rows = await db.query('folders', where: 'id = ?', whereArgs: [folderId]);
+    expect(rows.first['message_count'], 3);
+  });
 }

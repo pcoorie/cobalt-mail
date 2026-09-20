@@ -53,14 +53,25 @@ class _FolderViewScreenState extends ConsumerState<FolderViewScreen> {
     super.dispose();
   }
 
+  /// Inbox/Sent/Trash always; Drafts only once the account actually has any
+  /// (see MailFolder.messageCount's doc comment) — otherwise it stays
+  /// behind "More folders" rather than showing an always-empty tab.
+  List<MailFolderType> _primaryFolderTypes(List<MailFolder> folders) {
+    final hasDrafts = folders.any(
+      (f) => f.type == MailFolderType.drafts && f.messageCount > 0,
+    );
+    return [
+      MailFolderType.inbox,
+      MailFolderType.sent,
+      if (hasDrafts) MailFolderType.drafts,
+      MailFolderType.trash,
+    ];
+  }
+
   MailFolder? _currentFolder(List<MailFolder>? folders) {
     if (folders == null) return null;
     final defaults = <MailFolder>[
-      for (final type in [
-        MailFolderType.inbox,
-        MailFolderType.sent,
-        MailFolderType.trash,
-      ])
+      for (final type in _primaryFolderTypes(folders))
         ...folders.where((f) => f.type == type),
     ];
     return _selected ??
@@ -270,11 +281,7 @@ class _FolderViewScreenState extends ConsumerState<FolderViewScreen> {
       body: foldersAsync.when(
         data: (folders) {
           final defaults = <MailFolder>[
-            for (final type in [
-              MailFolderType.inbox,
-              MailFolderType.sent,
-              MailFolderType.trash,
-            ])
+            for (final type in _primaryFolderTypes(folders))
               for (final f in folders.where((f) => f.type == type))
                 f.copyWith(unreadCount: localUnreadCounts[f.id] ?? f.unreadCount),
           ];

@@ -59,14 +59,30 @@ class EnoughMailTransport implements MailTransport {
     try {
       await client.connect();
       final mailboxes = await client.listMailboxes();
-      return mailboxes.map((box) {
-        return MailFolder(
+      final folders = <MailFolder>[];
+      for (final box in mailboxes) {
+        final type = _folderTypeFor(box);
+        var messageCount = 0;
+        // Scoped to Drafts only — see MailFolder.messageCount's doc comment
+        // for why this isn't done for every folder. STATUS doesn't change
+        // the selected mailbox or affect \Recent flags, so it's safe to
+        // call on a mailbox that isn't (and won't be) selected.
+        if (type == MailFolderType.drafts) {
+          final lowLevel = client.lowLevelIncomingMailClient;
+          if (lowLevel is enough.ImapClient) {
+            final status = await lowLevel.statusMailbox(box, [enough.StatusFlags.messages]);
+            messageCount = status.messagesExists;
+          }
+        }
+        folders.add(MailFolder(
           accountId: accountId,
           name: box.name,
           path: box.path,
-          type: _folderTypeFor(box),
-        );
-      }).toList();
+          type: type,
+          messageCount: messageCount,
+        ));
+      }
+      return folders;
     } finally {
       await client.disconnect();
     }
@@ -75,6 +91,7 @@ class EnoughMailTransport implements MailTransport {
   MailFolderType _folderTypeFor(enough.Mailbox box) {
     if (box.isInbox) return MailFolderType.inbox;
     if (box.isSent) return MailFolderType.sent;
+    if (box.isDrafts) return MailFolderType.drafts;
     if (box.isTrash) return MailFolderType.trash;
     if (box.isArchive) return MailFolderType.archive;
     return MailFolderType.other;

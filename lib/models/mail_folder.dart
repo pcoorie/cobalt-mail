@@ -9,6 +9,11 @@ class MailFolder extends Equatable {
     required this.path,
     required this.type,
     this.unreadCount = 0,
+    // Only ever populated for a `drafts`-typed folder (see
+    // EnoughMailTransport.discoverFolders) — a scoped IMAP STATUS call,
+    // not a general per-folder total. Stays 0 for every other folder type;
+    // don't read it expecting a real count elsewhere.
+    this.messageCount = 0,
     this.isLocalOnly = false,
     this.lastSyncedUid = 0,
   });
@@ -19,6 +24,7 @@ class MailFolder extends Equatable {
   final String path;
   final MailFolderType type;
   final int unreadCount;
+  final int messageCount;
   final bool isLocalOnly;
 
   /// High-water mark of the highest UID ever synced into this folder.
@@ -34,6 +40,7 @@ class MailFolder extends Equatable {
     String? path,
     MailFolderType? type,
     int? unreadCount,
+    int? messageCount,
     bool? isLocalOnly,
     int? lastSyncedUid,
   }) {
@@ -44,6 +51,7 @@ class MailFolder extends Equatable {
       path: path ?? this.path,
       type: type ?? this.type,
       unreadCount: unreadCount ?? this.unreadCount,
+      messageCount: messageCount ?? this.messageCount,
       isLocalOnly: isLocalOnly ?? this.isLocalOnly,
       lastSyncedUid: lastSyncedUid ?? this.lastSyncedUid,
     );
@@ -57,6 +65,7 @@ class MailFolder extends Equatable {
       'path': path,
       'type': type.name,
       'unread_count': unreadCount,
+      'message_count': messageCount,
       'is_local_only': isLocalOnly ? 1 : 0,
       'last_synced_uid': lastSyncedUid,
     };
@@ -70,6 +79,7 @@ class MailFolder extends Equatable {
       path: map['path'] as String,
       type: MailFolderType.values.byName(map['type'] as String),
       unreadCount: map['unread_count'] as int,
+      messageCount: (map['message_count'] as int?) ?? 0,
       isLocalOnly: (map['is_local_only'] as int) == 1,
       lastSyncedUid: (map['last_synced_uid'] as int?) ?? 0,
     );
@@ -77,5 +87,5 @@ class MailFolder extends Equatable {
 
   @override
   List<Object?> get props =>
-      [id, accountId, name, path, type, unreadCount, isLocalOnly, lastSyncedUid];
+      [id, accountId, name, path, type, unreadCount, messageCount, isLocalOnly, lastSyncedUid];
 }

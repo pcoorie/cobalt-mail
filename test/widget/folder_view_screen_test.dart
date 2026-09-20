@@ -104,6 +104,55 @@ void main() {
     expect(find.text('Archive'), findsOneWidget);
   });
 
+  testWidgets('keeps an empty Drafts folder behind "More folders"', (tester) async {
+    final drafts = MailFolder(
+      id: 5,
+      accountId: accountId,
+      name: 'Drafts',
+      path: 'Drafts',
+      type: MailFolderType.drafts,
+    );
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        foldersProvider.overrideWith((ref, id) async => [inbox, sent, trash, drafts]),
+        messagesProvider.overrideWith((ref, folder) async => const []),
+        swipeActionConfigProvider.overrideWith(() => _FakeSwipeActionConfigNotifier(SwipeActionConfig.defaults)),
+      ],
+      child: const MaterialApp(home: FolderViewScreen(accountId: accountId)),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Drafts'), findsNothing);
+
+    await tester.tap(find.text('More folders'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Drafts'), findsOneWidget);
+  });
+
+  testWidgets('promotes Drafts into the primary tab row when it has messages', (tester) async {
+    final drafts = MailFolder(
+      id: 5,
+      accountId: accountId,
+      name: 'Drafts',
+      path: 'Drafts',
+      type: MailFolderType.drafts,
+      messageCount: 2,
+    );
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        foldersProvider.overrideWith((ref, id) async => [inbox, sent, trash, drafts]),
+        messagesProvider.overrideWith((ref, folder) async => const []),
+        swipeActionConfigProvider.overrideWith(() => _FakeSwipeActionConfigNotifier(SwipeActionConfig.defaults)),
+      ],
+      child: const MaterialApp(home: FolderViewScreen(accountId: accountId)),
+    ));
+    await tester.pumpAndSettle();
+
+    // Visible immediately — no "More folders" tap needed.
+    expect(find.text('Drafts'), findsOneWidget);
+  });
+
   testWidgets('shows a friendly empty-state placeholder instead of a blank screen when the '
       'selected folder has no messages', (tester) async {
     await tester.pumpWidget(ProviderScope(

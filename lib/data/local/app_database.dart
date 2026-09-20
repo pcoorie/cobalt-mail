@@ -29,6 +29,7 @@ class AppDatabase {
         unread_count INTEGER NOT NULL DEFAULT 0,
         is_local_only INTEGER NOT NULL DEFAULT 0,
         last_synced_uid INTEGER NOT NULL DEFAULT 0,
+        message_count INTEGER NOT NULL DEFAULT 0,
         UNIQUE(account_id, path)
       )
     ''');
@@ -77,6 +78,11 @@ class AppDatabase {
       // display name until their next sync re-populates it.
       await db.execute('ALTER TABLE messages ADD COLUMN from_name TEXT');
     }
+    if (oldVersion < 4) {
+      // Backs Drafts-tab promotion (see FolderViewScreen) — total message
+      // count, only ever populated for a drafts-typed folder.
+      await db.execute('ALTER TABLE folders ADD COLUMN message_count INTEGER NOT NULL DEFAULT 0');
+    }
   }
 
   static Future<Database> open() async {
@@ -84,7 +90,7 @@ class AppDatabase {
     final path = p.join(dir.path, 'imap_mail.db');
     return openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: onCreate,
       onUpgrade: onUpgrade,
       onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
