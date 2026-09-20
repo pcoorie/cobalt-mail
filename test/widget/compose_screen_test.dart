@@ -54,6 +54,31 @@ void _growViewport(WidgetTester tester) {
   addTearDown(tester.view.resetDevicePixelRatio);
 }
 
+Future<void> _pumpPushedComposeScreen(
+  WidgetTester tester, {
+  MailMessage? replyTo,
+  MailMessage? forwardOf,
+}) async {
+  await tester.pumpWidget(ProviderScope(
+    child: MaterialApp(
+      home: Builder(
+        builder: (context) => Scaffold(
+          body: Center(
+            child: ElevatedButton(
+              onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => ComposeScreen(accountId: 1, replyTo: replyTo, forwardOf: forwardOf),
+              )),
+              child: const Text('Open'),
+            ),
+          ),
+        ),
+      ),
+    ),
+  ));
+  await tester.tap(find.text('Open'));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   const account = MailAccount(
     id: 1,
@@ -100,6 +125,85 @@ void main() {
     await tester.pump();
 
     expect(tester.widget<ElevatedButton>(sendButtonFinder).onPressed, isNotNull);
+  });
+
+  group('discard protection', () {
+    MailMessage replyMessage() => MailMessage(
+          folderId: 1,
+          uid: 1,
+          subject: 'Hello',
+          from: 'bob@example.com',
+          to: 'me@example.com',
+          date: DateTime.utc(2026, 1, 1),
+          snippet: '',
+        );
+
+    testWidgets('pops immediately when leaving a blank new compose', (tester) async {
+      _growViewport(tester);
+      await _pumpPushedComposeScreen(tester);
+
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Discard this message?'), findsNothing);
+      expect(find.byType(ComposeScreen), findsNothing);
+    });
+
+    testWidgets('shows a discard confirmation when leaving with unsaved content', (tester) async {
+      _growViewport(tester);
+      await _pumpPushedComposeScreen(tester);
+
+      await tester.enterText(find.byKey(const Key('bodyField')), 'Hello Bob');
+      await tester.pump();
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Discard this message?'), findsOneWidget);
+      // Cancel keeps the screen and its content.
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ComposeScreen), findsOneWidget);
+      expect(find.text('Hello Bob'), findsOneWidget);
+    });
+
+    testWidgets('discarding via the confirmation pops the screen', (tester) async {
+      _growViewport(tester);
+      await _pumpPushedComposeScreen(tester);
+
+      await tester.enterText(find.byKey(const Key('bodyField')), 'Hello Bob');
+      await tester.pump();
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Discard'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ComposeScreen), findsNothing);
+    });
+
+    testWidgets('an unedited reply pops immediately — prefilled fields are not "unsaved content"',
+        (tester) async {
+      _growViewport(tester);
+      await _pumpPushedComposeScreen(tester, replyTo: replyMessage());
+
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Discard this message?'), findsNothing);
+      expect(find.byType(ComposeScreen), findsNothing);
+    });
+
+    testWidgets('editing a prefilled reply field does show the discard confirmation', (tester) async {
+      _growViewport(tester);
+      await _pumpPushedComposeScreen(tester, replyTo: replyMessage());
+
+      await tester.enterText(find.byKey(const Key('subjectField')), 'Re: Hello (edited)');
+      await tester.pump();
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Discard this message?'), findsOneWidget);
+    });
   });
 
   testWidgets('Send button uses the brand color, not a hardcoded blue', (tester) async {

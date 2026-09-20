@@ -92,6 +92,15 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
   String? _error;
   bool _sending = false;
 
+  // Snapshotted once in initState, then compared against in
+  // _hasUnsavedContent — not blank, because a reply/forward pre-fills
+  // these three (see below). A plain non-empty check would show a discard
+  // prompt the instant a reply/forward is opened and backed out of
+  // untouched, before the user has typed anything.
+  late String _initialTo;
+  late String _initialSubject;
+  late String _initialBody;
+
   @override
   void initState() {
     super.initState();
@@ -101,12 +110,17 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
       text: source == null
           ? ''
           : widget.replyTo != null
-              ? 'Re: ${source.subject}'
-              : 'Fwd: ${source.subject}',
+          ? 'Re: ${source.subject}'
+          : 'Fwd: ${source.subject}',
     );
     _body = TextEditingController(
-      text: widget.forwardOf != null ? '\n\n---\n${_quotedBody(widget.forwardOf!)}' : '',
+      text: widget.forwardOf != null
+          ? '\n\n---\n${_quotedBody(widget.forwardOf!)}'
+          : '',
     );
+    _initialTo = _to.text.trim();
+    _initialSubject = _subject.text.trim();
+    _initialBody = _body.text.trim();
     for (final controller in [_to, _cc, _bcc, _subject, _body]) {
       controller.addListener(() => setState(() {}));
     }
@@ -122,7 +136,37 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
     super.dispose();
   }
 
-  bool get _isValid => _to.text.trim().isNotEmpty && _body.text.trim().isNotEmpty;
+  bool get _isValid =>
+      _to.text.trim().isNotEmpty && _body.text.trim().isNotEmpty;
+
+  bool get _hasUnsavedContent =>
+      _to.text.trim() != _initialTo ||
+      _subject.text.trim() != _initialSubject ||
+      _body.text.trim() != _initialBody ||
+      _cc.text.trim().isNotEmpty ||
+      _bcc.text.trim().isNotEmpty ||
+      _attachmentPaths.isNotEmpty;
+
+  Future<bool> _confirmDiscard() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Discard this message?'),
+        content: const Text('Your unsent message will be lost.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Discard'),
+          ),
+        ],
+      ),
+    );
+    return confirmed == true;
+  }
 
   Future<void> _pickAttachment() async {
     // NOTE: deviates from the brief, which calls `FilePicker.platform.pickFiles()`
@@ -144,7 +188,9 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
   /// from MessageDetailScreen before forwarding) reuses its cached
   /// `localPath` instead of re-fetching it.
   Future<List<String>> _resolveOriginalAttachmentPaths() async {
-    if (!_includeOriginalAttachments || widget.forwardAttachments.isEmpty) return const [];
+    if (!_includeOriginalAttachments || widget.forwardAttachments.isEmpty) {
+      return const [];
+    }
     final repository = await ref.read(mailRepositoryProvider.future);
     final accounts = await ref.read(accountsProvider.future);
     final account = accounts.firstWhere((a) => a.id == widget.accountId);
@@ -182,9 +228,21 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
       final account = accounts.firstWhere((a) => a.id == widget.accountId);
       final originalAttachmentPaths = await _resolveOriginalAttachmentPaths();
       final composed = ComposedMessage(
-        to: _to.text.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
-        cc: _cc.text.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
-        bcc: _bcc.text.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
+        to: _to.text
+            .split(',')
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toList(),
+        cc: _cc.text
+            .split(',')
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toList(),
+        bcc: _bcc.text
+            .split(',')
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toList(),
         subject: _subject.text.trim(),
         bodyText: _body.text,
         bodyHtml: null,
@@ -213,53 +271,83 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Compose')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          TextField(key: const Key('toField'), controller: _to,
-              decoration: const InputDecoration(labelText: 'To')),
-          TextField(key: const Key('ccField'), controller: _cc,
-              decoration: const InputDecoration(labelText: 'Cc')),
-          TextField(key: const Key('bccField'), controller: _bcc,
-              decoration: const InputDecoration(labelText: 'Bcc')),
-          TextField(key: const Key('subjectField'), controller: _subject,
-              decoration: const InputDecoration(labelText: 'Subject')),
-          TextField(key: const Key('bodyField'), controller: _body, maxLines: 10,
-              decoration: const InputDecoration(labelText: 'Message')),
-          if (widget.forwardAttachments.isNotEmpty)
-            CheckboxListTile(
-              contentPadding: EdgeInsets.zero,
-              controlAffinity: ListTileControlAffinity.leading,
-              value: _includeOriginalAttachments,
-              onChanged: (value) => setState(() => _includeOriginalAttachments = value ?? true),
-              title: Text(
-                'Include ${widget.forwardAttachments.length} original attachment'
-                '${widget.forwardAttachments.length == 1 ? '' : 's'}',
+  Widget build(BuildContext _) {
+    return PopScope(
+      canPop: !_hasUnsavedContent,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final confirmed = await _confirmDiscard();
+        if (confirmed && mounted) Navigator.of(context).pop();
+      },
+      child: Scaffold(
+        appBar: AppBar(title: const Text('Compose')),
+        body: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            TextField(
+              key: const Key('toField'),
+              controller: _to,
+              decoration: const InputDecoration(labelText: 'To'),
+            ),
+            TextField(
+              key: const Key('ccField'),
+              controller: _cc,
+              decoration: const InputDecoration(labelText: 'Cc'),
+            ),
+            TextField(
+              key: const Key('bccField'),
+              controller: _bcc,
+              decoration: const InputDecoration(labelText: 'Bcc'),
+            ),
+            TextField(
+              key: const Key('subjectField'),
+              controller: _subject,
+              decoration: const InputDecoration(labelText: 'Subject'),
+            ),
+            TextField(
+              key: const Key('bodyField'),
+              controller: _body,
+              maxLines: 10,
+              decoration: const InputDecoration(labelText: 'Message'),
+            ),
+            if (widget.forwardAttachments.isNotEmpty)
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                value: _includeOriginalAttachments,
+                onChanged: (value) =>
+                    setState(() => _includeOriginalAttachments = value ?? true),
+                title: Text(
+                  'Include ${widget.forwardAttachments.length} original attachment'
+                  '${widget.forwardAttachments.length == 1 ? '' : 's'}',
+                ),
+              ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: _pickAttachment,
+              icon: const Icon(Icons.attach_file),
+              label: Text(
+                _attachmentPaths.isEmpty
+                    ? 'Attach file'
+                    : '${_attachmentPaths.length} attached',
               ),
             ),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(
-            onPressed: _pickAttachment,
-            icon: const Icon(Icons.attach_file),
-            label: Text(_attachmentPaths.isEmpty ? 'Attach file' : '${_attachmentPaths.length} attached'),
-          ),
-          if (_error != null) Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(_error!, style: const TextStyle(color: Colors.red)),
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: _isValid && !_sending ? _send : null,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: brandSeed,
-              foregroundColor: Colors.white,
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(_error!, style: const TextStyle(color: Colors.red)),
+              ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _isValid && !_sending ? _send : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: brandSeed,
+                foregroundColor: Colors.white,
+              ),
+              child: Text(_sending ? 'Sending...' : 'Send'),
             ),
-            child: Text(_sending ? 'Sending...' : 'Send'),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
