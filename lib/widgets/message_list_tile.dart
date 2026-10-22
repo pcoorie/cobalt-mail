@@ -40,8 +40,8 @@ class MessageListTile extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return Container(
       key: const Key('selectionCheckbox'),
-      width: 24,
-      height: 24,
+      width: 44,
+      height: 44,
       margin: const EdgeInsets.only(right: 12),
       decoration: BoxDecoration(
         shape: BoxShape.circle,
@@ -128,6 +128,8 @@ class MessageListTile extends StatelessWidget {
         children: [
           if (message.isFlagged)
             const Icon(Icons.flag, size: 16, color: Colors.orange),
+          if (message.isRead == false)
+            const Icon(Icons.circle, size: 8, color: Colors.blue),
           Text(formatMessageDate(message.date)),
         ],
       ),
