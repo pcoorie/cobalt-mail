@@ -16,6 +16,7 @@ import '../providers/message_providers.dart';
 import '../providers/repository_providers.dart';
 import '../providers/send_sound_providers.dart';
 import '../theme/brand_colors.dart';
+import '../utils/email_validator.dart';
 import '../utils/html_text.dart';
 
 /// The body text to quote when forwarding [message]: its plain-text part
@@ -92,6 +93,14 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
   String? _error;
   bool _sending = false;
 
+  // Validation state for email fields
+  bool _toValid = true;
+  bool _ccValid = true;
+  bool _bccValid = true;
+  String? _toValidationError;
+  String? _ccValidationError;
+  String? _bccValidationError;
+
   // Snapshotted once in initState, then compared against in
   // _hasUnsavedContent — not blank, because a reply/forward pre-fills
   // these three (see below). A plain non-empty check would show a discard
@@ -121,9 +130,19 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
     _initialTo = _to.text.trim();
     _initialSubject = _subject.text.trim();
     _initialBody = _body.text.trim();
-    for (final controller in [_to, _cc, _bcc, _subject, _body]) {
-      controller.addListener(() => setState(() {}));
-    }
+    
+    // Set up listeners for validation on input changes
+    _to.addListener(() => setState(() {
+      _validateEmailFields();
+    }));
+    _cc.addListener(() => setState(() {
+      _validateEmailFields();
+    }));
+    _bcc.addListener(() => setState(() {
+      _validateEmailFields();
+    }));
+    _subject.addListener(() => setState(() {}));
+    _body.addListener(() => setState(() {}));
   }
 
   @override
@@ -137,7 +156,11 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
   }
 
   bool get _isValid =>
-      _to.text.trim().isNotEmpty && _body.text.trim().isNotEmpty;
+      _to.text.trim().isNotEmpty && 
+      _body.text.trim().isNotEmpty &&
+      _toValid && 
+      _ccValid && 
+      _bccValid;
 
   bool get _hasUnsavedContent =>
       _to.text.trim() != _initialTo ||
@@ -146,6 +169,51 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
       _cc.text.trim().isNotEmpty ||
       _bcc.text.trim().isNotEmpty ||
       _attachmentPaths.isNotEmpty;
+
+  /// Performs validation on email fields and updates the UI with error messages
+  void _validateEmailFields() {
+    // Validate To field
+    if (_to.text.trim().isEmpty) {
+      _toValid = true; // Allow empty to field (for replies/forwards)
+      _toValidationError = null;
+    } else {
+      final result = EmailValidator.validateEmailListWithDetails(_to.text);
+      _toValid = result['invalid']!.isEmpty;
+      if (!_toValid && result['invalid']!.isNotEmpty) {
+        _toValidationError = 'Please enter a valid email address';
+      } else {
+        _toValidationError = null;
+      }
+    }
+
+    // Validate CC field
+    if (_cc.text.trim().isEmpty) {
+      _ccValid = true;
+      _ccValidationError = null;
+    } else {
+      final result = EmailValidator.validateEmailListWithDetails(_cc.text);
+      _ccValid = result['invalid']!.isEmpty;
+      if (!_ccValid && result['invalid']!.isNotEmpty) {
+        _ccValidationError = 'Invalid email(s) in this field';
+      } else {
+        _ccValidationError = null;
+      }
+    }
+
+    // Validate BCC field
+    if (_bcc.text.trim().isEmpty) {
+      _bccValid = true;
+      _bccValidationError = null;
+    } else {
+      final result = EmailValidator.validateEmailListWithDetails(_bcc.text);
+      _bccValid = result['invalid']!.isEmpty;
+      if (!_bccValid && result['invalid']!.isNotEmpty) {
+        _bccValidationError = 'Invalid email(s) in this field';
+      } else {
+        _bccValidationError = null;
+      }
+    }
+  }
 
   Future<bool> _confirmDiscard() async {
     final confirmed = await showDialog<bool>(
@@ -219,6 +287,9 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
   }
 
   Future<void> _send() async {
+    // Validate fields before sending
+    _validateEmailFields();
+    
     setState(() {
       _sending = true;
       _error = null;
@@ -287,17 +358,59 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
             TextField(
               key: const Key('toField'),
               controller: _to,
-              decoration: const InputDecoration(labelText: 'To'),
+              decoration: InputDecoration(
+                labelText: 'To',
+                errorText: _toValidationError,
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(
+                    color: _toValid ? Colors.grey : Colors.red,
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(
+                    color: _toValid ? Colors.blue : Colors.red,
+                  ),
+                ),
+              ),
+              onChanged: (_) => _validateEmailFields(),
             ),
             TextField(
               key: const Key('ccField'),
               controller: _cc,
-              decoration: const InputDecoration(labelText: 'Cc'),
+              decoration: InputDecoration(
+                labelText: 'Cc',
+                errorText: _ccValidationError,
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(
+                    color: _ccValid ? Colors.grey : Colors.red,
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(
+                    color: _ccValid ? Colors.blue : Colors.red,
+                  ),
+                ),
+              ),
+              onChanged: (_) => _validateEmailFields(),
             ),
             TextField(
               key: const Key('bccField'),
               controller: _bcc,
-              decoration: const InputDecoration(labelText: 'Bcc'),
+              decoration: InputDecoration(
+                labelText: 'Bcc',
+                errorText: _bccValidationError,
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(
+                    color: _bccValid ? Colors.grey : Colors.red,
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(
+                    color: _bccValid ? Colors.blue : Colors.red,
+                  ),
+                ),
+              ),
+              onChanged: (_) => _validateEmailFields(),
             ),
             TextField(
               key: const Key('subjectField'),
